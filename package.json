@@ -1,0 +1,11 @@
+{
+  "name": "sharr",
+  "private": true,
+  "workspaces": ["apps/server", "apps/web"],
+  "scripts": {
+    "dev": "echo 'not implemented yet'",
+    "dev:server": "bun --filter server dev",
+    "dev:web": "bun --filter web dev",
+    "build": "bun --filter '*' build"
+  }
+}

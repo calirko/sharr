@@ -1,0 +1,59 @@
+services:
+  # Web build + API. The single Nginx Proxy Manager entry (sharr.calirko.com) points here.
+  # Uncomment once apps/server has code and a Dockerfile.
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/server/Dockerfile
+  #   container_name: sharr-app
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - NODE_ENV=production
+  #     - PORT=3000
+  #     - TZ=America/Sao_Paulo
+  #   depends_on:
+  #     - db
+  #   networks:
+  #     default:
+  #     dragon:
+  #       aliases:
+  #         - sharr
+  #   restart: unless-stopped
+
+  # SFU. NPM only proxies its websocket signaling (custom location /rtc -> sharr-livekit:7880).
+  # Media (UDP/TCP) can't go through NPM, so those ports are published on the host.
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: sharr-livekit
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7881:7881/tcp"    # ICE/TCP fallback
+      - "7882:7882/udp"    # ICE/UDP, all media on one port
+      - "3478:3478/udp"    # TURN/UDP
+    networks:
+      dragon:
+        aliases:
+          - sharr-livekit
+    restart: unless-stopped
+
+  # Private: only reachable by app over the stack's default network.
+  db:
+    image: redis:7-alpine
+    container_name: sharr-db
+    command: redis-server --appendonly yes
+    volumes:
+      - sharr_data:/data
+    restart: unless-stopped
+
+volumes:
+  sharr_data:
+    name: sharr_data
+
+networks:
+  dragon:
+    external: true

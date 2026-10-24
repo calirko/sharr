@@ -1,0 +1,11 @@
+# Local dev: publish LiveKit signaling and Redis to the host so `bun run dev:*` can reach them.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d livekit db
+services:
+  livekit:
+    volumes:
+      - ./infra/livekit/livekit.dev.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "127.0.0.1:7880:7880/tcp"
+  db:
+    ports:
+      - "127.0.0.1:6379:6379"

@@ -1,0 +1,6 @@
+node_modules
+dist
+.env
+*.db
+target
+apps/desktop/src-tauri/gen
