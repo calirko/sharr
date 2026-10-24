@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-M1 (server core) is done: `apps/server` has guest sessions, rooms with PINs, LiveKit token minting and idle room expiry. `apps/web` and `apps/desktop` are still empty. `apps/web` is not in the root `workspaces` yet; add it back when it gets a `package.json`. Commands below marked *(planned)* do not work yet.
+M1 (server core) is done and deployed to prod (M2): `apps/server` has guest sessions, rooms with PINs, LiveKit token minting and idle room expiry. Next is M3, the web app. `apps/web` and `apps/desktop` are still empty. `apps/web` is not in the root `workspaces` yet; add it back when it gets a `package.json`. Commands below marked *(planned)* do not work yet.
 
 Server API (all under `/api`, JSON): `GET /health`, `POST /session/guest {nickname}`, `GET /session/me`, `DELETE /session`, `GET|POST /rooms`, `GET|PATCH|DELETE /rooms/:id`, `POST /rooms/:id/join {pin?}` → `{url, token, name, can_share, is_creator}`. Redis keys: `session:{sid}`, `room:{id}`, `room:{id}:names` (recent name claims), `rooms` (zset).
 
