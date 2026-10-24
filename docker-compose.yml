@@ -1,6 +1,7 @@
 services:
   # Web build + API. The single Nginx Proxy Manager entry (sharr.calirko.com) points here.
-  app:
+  # Not named "app": service names become DNS names on dragon, and calirko.com's app already uses that.
+  sharr:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
