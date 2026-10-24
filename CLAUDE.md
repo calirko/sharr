@@ -45,7 +45,7 @@ apps/server/   Bun API: Discord OAuth, guest sessions, rooms + PINs, LiveKit tok
                (the admin page UI lives in apps/web under an /admin route)
 apps/web/      React + Vite + Tailwind + shadcn frontend (mobile + desktop)
 apps/desktop/  Tauri shell (Windows + Linux) wrapping the web app, plus native capture in src-tauri/ (Rust)
-infra/livekit/ livekit-server config
+infra/livekit/ livekit-server dev config (prod config is inline in docker-compose.yml `configs:`)
 docker-compose.yml, .env.example   (root)
 ```
 
@@ -87,6 +87,8 @@ cd apps/desktop && cargo tauri dev   # (planned)
 Copy `.env.example` to `.env` first. LiveKit runs with `use_external_ip: true` so it advertises the server's public IP; without that, clients behind NAT get unusable ICE candidates.
 
 ## Deployment (same pattern as sonawr/powerr)
+
+Deployed with **Dokploy** (compose app). Env vars go in Dokploy's Environment tab (it writes `.env`); generate them with `scripts/gen-env.sh`. Don't bind-mount repo files in `docker-compose.yml`: Dokploy's checkout doesn't keep them on disk, and Docker creates an empty directory in their place.
 
 Deployed behind **Nginx Proxy Manager (NPM)** on the existing external Docker network `dragon` (must already exist: `docker network create dragon`). Same conventions as the sibling projects in `~/Projects` (`sonawr/compose.yml`, `powerr/docker-compose.yml`): `container_name` set, each public service joins `dragon` with an `aliases:` entry, no published ports for anything NPM fronts, named volumes. (`backupr` itself wasn't on this machine; these siblings were used as the reference.)
 

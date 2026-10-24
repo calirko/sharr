@@ -2,8 +2,9 @@
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d livekit db
 services:
   livekit:
+    command: --config /etc/livekit.dev.yaml
     volumes:
-      - ./infra/livekit/livekit.dev.yaml:/etc/livekit.yaml:ro
+      - ./infra/livekit/livekit.dev.yaml:/etc/livekit.dev.yaml:ro
     ports:
       - "127.0.0.1:7880:7880/tcp"
   db:

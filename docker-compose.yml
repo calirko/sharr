@@ -30,8 +30,9 @@ services:
     command: --config /etc/livekit.yaml
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
-    volumes:
-      - ./infra/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    configs:
+      - source: livekit
+        target: /etc/livekit.yaml
     ports:
       - "7881:7881/tcp"    # ICE/TCP fallback
       - "7882:7882/udp"    # ICE/UDP, all media on one port
@@ -50,6 +51,20 @@ services:
     volumes:
       - sharr_data:/data
     restart: unless-stopped
+
+# Inline so it doesn't depend on repo files being on disk at deploy time (Dokploy).
+configs:
+  livekit:
+    content: |
+      port: 7880
+      rtc:
+        tcp_port: 7881
+        udp_port: 7882        # single-port UDP mux; port_range_* is ignored when set
+        use_external_ip: true # advertise the server's public IP to clients behind NAT
+      turn:
+        enabled: true
+        udp_port: 3478
+        # TURN/TLS needs its own hostname (not behind NPM); add later if UDP is blocked for some clients.
 
 volumes:
   sharr_data:
