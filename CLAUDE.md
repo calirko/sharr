@@ -11,7 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Scaffold only — no application code yet. Directory layout, `docker-compose.yml`, `.env.example` and the LiveKit config exist; everything under `apps/` is empty (`.gitkeep`). Commands below marked *(planned)* do not work until the apps are built.
+M1 (server core) is done: `apps/server` has guest sessions, rooms with PINs, LiveKit token minting and idle room expiry. `apps/web` and `apps/desktop` are still empty. `apps/web` is not in the root `workspaces` yet; add it back when it gets a `package.json`. Commands below marked *(planned)* do not work yet.
+
+Server API (all under `/api`, JSON): `GET /health`, `POST /session/guest {nickname}`, `GET /session/me`, `DELETE /session`, `GET|POST /rooms`, `GET|PATCH|DELETE /rooms/:id`, `POST /rooms/:id/join {pin?}` → `{url, token, name, can_share, is_creator}`. Redis keys: `session:{sid}`, `room:{id}`, `room:{id}:names` (recent name claims), `rooms` (zset).
 
 See `ROADMAP.md` for milestones; keep it updated as items complete. Once the backend works it is **deployed to prod early and tested from `https://sharr.calirko.com`**, not just localhost.
 
@@ -74,9 +76,10 @@ This repo is **public** and hosts the releases for both Windows and Linux (GitHu
 Toolchain on the dev machine: bun, node, pnpm, cargo. Docker is being set up locally by the user; local dev runs LiveKit + Redis in containers (the external `dragon` network must exist: `docker network create dragon`).
 
 ```
-bun install                  # install workspace deps (planned, once apps have package.json deps)
+bun install                  # install workspace deps
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d livekit db   # local SFU + Redis; dev override publishes 7880/6379 to localhost and uses infra/livekit/livekit.dev.yaml (loopback ICE, no TURN). Needs the external `dragon` network.
-bun run dev:server           # (planned)
+bun run dev:server           # API on :3000, loads the root .env (use localhost values for REDIS_URL, LIVEKIT_API_URL, LIVEKIT_URL=ws://localhost:7880)
+cd apps/server && bun run typecheck
 bun run dev:web              # (planned)
 cd apps/desktop && cargo tauri dev   # (planned)
 ```
@@ -91,6 +94,6 @@ Deployed behind **Nginx Proxy Manager (NPM)** on the existing external Docker ne
 
 **NPM cannot carry media.** These LiveKit ports are published directly on the host and must be open in the firewall/router: `7882/udp` (all ICE/UDP, single-port mux), `7881/tcp` (ICE/TCP fallback), `3478/udp` (TURN). If `sharr.calirko.com` sits behind Cloudflare, the proxy is fine for the web/`/rtc` traffic but the media ports bypass it, since the clients connect to the server IP learned via ICE. TURN/TLS on 443 would need its own hostname and is not set up yet.
 
-`db` (Redis) is only on the stack's private default network, with no alias on `dragon`. `app` is commented out in `docker-compose.yml` until `apps/server` exists; it must be on both `default` (to reach `db`) and `dragon`.
+`db` (Redis) is only on the stack's private default network, with no alias on `dragon`. `app` is on both `default` (to reach `db`) and `dragon` (NPM, LiveKit). Compose sets `REDIS_URL` and `LIVEKIT_API_URL` for the container, so `.env` can keep localhost values for dev.
 
-No lint/test setup yet; add the commands here when they exist.
+No lint/test setup yet besides `typecheck`; add the commands here when they exist.

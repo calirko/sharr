@@ -1,0 +1,20 @@
+{
+  "name": "server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env --watch src/index.ts",
+    "typecheck": "tsc",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
+    "hono": "^4.13.13",
+    "livekit-server-sdk": "^2.19.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

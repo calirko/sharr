@@ -8,13 +8,13 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [x] Monorepo layout, compose (`dragon` network, NPM pattern), LiveKit config, `.env.example`, `CLAUDE.md`
 
 ## M1 — Server core (`apps/server`)
-- [ ] Hono app on Bun, Redis client, config from env, health endpoint
-- [ ] Signed-cookie sessions stored in Redis
-- [ ] Guest session: nickname set, duplicate suffixing per room
-- [ ] Rooms: create (optional PIN, hashed), join, list, settings (who may share), close
-- [ ] LiveKit token minting: PIN check, `canPublish` from room settings, nickname/identity in token
-- [ ] Room expiry after inactivity (uses LiveKit server API to check participants)
-- [ ] Dockerfile, enable `app` in compose
+- [x] Hono app on Bun, Redis client, config from env, health endpoint
+- [x] Signed-cookie sessions stored in Redis
+- [x] Guest session: nickname set, duplicate suffixing per room
+- [x] Rooms: create (optional PIN, hashed), join, list, settings (who may share), close
+- [x] LiveKit token minting: PIN check, `canPublish` from room settings, nickname/identity in token
+- [x] Room expiry after inactivity (uses LiveKit server API to check participants)
+- [x] Dockerfile, enable `app` in compose
 
 ## M2 — First prod deploy (before any real UI)
 - [ ] Open `7882/udp`, `7881/tcp`, `3478/udp` on the host/router
