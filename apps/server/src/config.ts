@@ -17,5 +17,7 @@ export const config = {
     apiKey: required("LIVEKIT_API_KEY"),
     apiSecret: required("LIVEKIT_API_SECRET"),
   },
+  // Relative to the server's working dir (apps/server)
+  webDist: process.env.WEB_DIST ?? "../web/dist",
   roomIdleMinutes: Number(process.env.ROOM_IDLE_MINUTES ?? 30),
 };

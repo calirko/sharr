@@ -57,6 +57,11 @@ export async function createGuestSession(c: Context, nickname: string): Promise<
   return session;
 }
 
+export async function setNickname(session: Session, nickname: string) {
+  await redis.hset(key(session.sid), { nickname });
+  session.nickname = nickname;
+}
+
 export async function destroySession(c: Context, session: Session) {
   await redis.del(key(session.sid));
   deleteCookie(c, COOKIE, { path: "/" });
