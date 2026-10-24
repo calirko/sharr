@@ -11,9 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-M1 (server core) is done and deployed to prod (M2): `apps/server` has guest sessions, rooms with PINs, LiveKit token minting and idle room expiry. Next is M3, the web app. `apps/web` and `apps/desktop` are still empty. `apps/web` is not in the root `workspaces` yet; add it back when it gets a `package.json`. Commands below marked *(planned)* do not work yet.
+M1 (server core) is done and deployed to prod (M2): `apps/server` has guest sessions, rooms with PINs, LiveKit token minting and idle room expiry. M3 (web app) is built and passes a local headless test; it still needs testing on prod and on real browsers (see `ROADMAP.md`). `apps/desktop` is still empty. Commands below marked *(planned)* do not work yet.
 
-Server API (all under `/api`, JSON): `GET /health`, `POST /session/guest {nickname}`, `GET /session/me`, `DELETE /session`, `GET|POST /rooms`, `GET|PATCH|DELETE /rooms/:id`, `POST /rooms/:id/join {pin?}` → `{url, token, name, can_share, is_creator}`. Redis keys: `session:{sid}`, `room:{id}`, `room:{id}:names` (recent name claims), `rooms` (zset).
+The server serves the web build (`apps/web/dist`, override with `WEB_DIST`) with an `index.html` fallback for client routes. The Dockerfile builds the web app in its own stage. Web routes: `/` (nickname, room list), `/r/:id` (room). Chat uses LiveKit text streams on topic `lk.chat` through our own hook (`apps/web/src/lib/chat.ts`), not `useChat`: messages can arrive before the sender's participant is known, and `useChat` then loses the sender for good. Spam limits (5 messages per 10s per sender, 1000 chars, collapsed blank lines) are enforced by every receiver in that hook, since the server never sees chat. Shadcn components live in `apps/web/src/components/ui` (add more with `bunx --bun shadcn@latest add <name>` from `apps/web`; check that it imports `cn` from `@/lib/utils`, it once pulled in an unrelated `cn` package).
+
+Server API (all under `/api`, JSON): `GET /health`, `POST /session/guest {nickname}`, `GET /session/me`, `PATCH /session {nickname}` (keeps user_id), `DELETE /session`, `GET /rooms` (own rooms only), `POST /rooms`, `GET|PATCH|DELETE /rooms/:id`, `POST /rooms/:id/join {pin?}` → `{url, token, name, can_share, is_creator}` (the creator skips the PIN). Redis keys: `session:{sid}`, `room:{id}`, `room:{id}:names` (recent name claims), `rooms` (zset).
 
 See `ROADMAP.md` for milestones; keep it updated as items complete. Once the backend works it is **deployed to prod early and tested from `https://sharr.calirko.com`**, not just localhost.
 
@@ -23,8 +25,8 @@ See `ROADMAP.md` for milestones; keep it updated as items complete. Once the bac
 
 A deliberately small screen-sharing app. Scope is **only**:
 
-- **Screen sharing**, capped at **1080p60**. "Higher quality" means a higher bitrate tier within that cap, not a higher resolution. Each sharer can pick a quality (bitrate) tier. Screen/tab **audio is shared** along with the video; no microphone, no voice calls.
-- **Rooms**: create / join / list. Rooms are ephemeral: they close automatically after a period of inactivity, or when the creator (or an admin) closes them.
+- **Screen sharing**, capped at **1080p60**. "Higher quality" means a higher bitrate tier within that cap, not a higher resolution. Each sharer can pick a quality (bitrate) tier and 30 or 60 fps. Screen/tab **audio is shared** along with the video; no microphone, no voice calls.
+- **Rooms**: create / join / list. The list only shows rooms you created; other rooms are joined by link only (Invite button in the room, copy link in the list). Rooms are ephemeral: they close automatically after a period of inactivity, or when the creator (or an admin) closes them.
 - **Room settings dialog** (button in the room, creator only). Includes **who may share**: only the creator, or everyone (several simultaneous sharers are supported). Keep other settings to what is actually needed.
 - **Room PIN**: a join PIN, **optional** — the creator may set one when making a room; rooms without a PIN are open to join. The server must check the PIN before minting a LiveKit token (never rely on the client). Likewise, "who may share" is enforced via the LiveKit token's `canPublish` grant, not just hidden in the UI.
 - **Chat** per room, with a nickname. Login is via **Discord (identity only — the `identify` scope, no guilds/bot)** or **guest**. Discord login exists only so people can be identified against their Discord identity.
@@ -80,7 +82,8 @@ bun install                  # install workspace deps
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d livekit db   # local SFU + Redis; dev override publishes 7880/6379 to localhost and uses infra/livekit/livekit.dev.yaml (loopback ICE, no TURN). Needs the external `dragon` network.
 bun run dev:server           # API on :3000, loads the root .env (use localhost values for REDIS_URL, LIVEKIT_API_URL, LIVEKIT_URL=ws://localhost:7880)
 cd apps/server && bun run typecheck
-bun run dev:web              # (planned)
+bun run dev:web              # Vite on :5173, proxies /api to :3000
+cd apps/web && bun run typecheck && bun run build   # build to apps/web/dist, which the server serves on :3000
 cd apps/desktop && cargo tauri dev   # (planned)
 ```
 

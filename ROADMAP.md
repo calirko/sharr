@@ -25,13 +25,17 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [ ] Media test from outside the network, incl. a phone on mobile data for NAT/TURN (needs M3)
 
 ## M3 — Web app (`apps/web`), tested on prod
-- [ ] Vite + React + Tailwind + shadcn, served by the `sharr` container
-- [ ] Nickname entry, room list/create/join (PIN prompt)
-- [ ] Room view: share screen (1080p60 cap, quality/bitrate tier picker, audio on), watch streams, several sharers
-- [ ] Room settings dialog (creator only)
-- [ ] Chat over LiveKit data channels
-- [ ] Responsive layout (mobile viewing, desktop sharing)
-- [ ] Verify on Windows Chrome/Firefox and Linux Wayland (portal + PipeWire)
+- [x] Vite + React + Tailwind + shadcn, served by the `sharr` container
+- [x] Nickname entry, room list/create/join (PIN prompt)
+- [x] Room view: share screen (1080p60 cap, quality/bitrate tier picker, audio on), watch streams, several sharers
+- [x] Room settings dialog (creator only)
+- [x] Chat over LiveKit data channels
+- [x] Responsive layout (mobile viewing, desktop sharing)
+- [x] Local headless test (two browsers): PIN, share, receive 1080p, chat, live share permission change, stop, close room
+- [ ] Deploy and test on `https://sharr.calirko.com` (incl. the M2 phone-on-mobile-data media test)
+- [ ] Verify on Windows Chrome/Firefox and Linux Wayland (portal + PipeWire), incl. tab/system audio
+  - Firefox on Hyprland: picture goes green or the share stops after switching workspaces, portal bug (see `docs/known-issues/hyprland-portal-green-frames.md`)
+  - Firefox publishes no audio track with the share (seen in LiveKit logs); Chrome does. Retest Chrome tab vs whole-screen audio on Linux
 
 ## M4 — Discord login + history
 - [ ] Discord OAuth2 (`identify` only), identity shown in rooms
