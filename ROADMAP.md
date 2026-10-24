@@ -21,7 +21,7 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [x] Cloudflare Tunnel routes: `sharr.calirko.com` `^/rtc` → `sharr-livekit:7880`, then `sharr.calirko.com` → `sharr:3000`
 - [x] Real `.env` in Dokploy, generated with `scripts/gen-env.sh`
 - [x] Smoke test from outside: `/api/health` ok, `/rtc/validate` reaches LiveKit
-- [ ] Router forwards `7882/udp`, `7881/tcp`, `3478/udp` from `177.126.154.73` to dragon (confirm set up)
+- [x] Router forwards `7882/udp`, `7881/tcp`, `3478/udp` from `177.126.154.73` to dragon (7881/tcp open, 3478/udp answers STUN; no host firewall)
 - [ ] Media test from outside the network, incl. a phone on mobile data for NAT/TURN (needs M3)
 
 ## M3 — Web app (`apps/web`), tested on prod
