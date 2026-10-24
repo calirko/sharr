@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Writing (code comments, docs, UI text, commit messages): avoid AI-sounding characters and phrasing. No em dashes, no long obvious sentences, no filler. Keep it short and plain.
 - Naming: camelCase for functions and objects, snake_case for data (DB fields, JSON payloads, env-style keys).
-- Icons: Tabler icons only.
+- Icons: Lucide icons only.
 - Fonts: Inter only, for now.
 
 ## Status
