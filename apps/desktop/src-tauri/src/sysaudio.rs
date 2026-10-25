@@ -65,7 +65,7 @@ pub async fn system_audio_stop() {
 }
 
 /// The AppImage ships its own libpipewire. Point it at the modules bundled with it
-/// (scripts/appimage-pipewire.sh), the host's may not match its version. Call before any threads start.
+/// (scripts/appimage-libs.sh), the host's may not match its version. Call before any threads start.
 pub fn use_bundled_pipewire() {
     let Some(dir) = std::env::var_os("APPDIR").map(|d| std::path::PathBuf::from(d).join("pipewire")) else {
         return;

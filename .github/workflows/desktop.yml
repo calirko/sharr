@@ -46,7 +46,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libpipewire-0.3-dev libpipewire-0.3-modules libspa-0.2-modules libpulse0 libclang-dev patchelf
+          sudo apt-get install -y libgtk-4-dev libpipewire-0.3-dev libpipewire-0.3-modules libspa-0.2-modules libpulse0 libclang-dev patchelf \
+            libgl1 libegl1 libgles2 libgl1-mesa-dri libglx-mesa0 libegl-mesa0
 
       - run: bun install --frozen-lockfile
 
@@ -70,7 +71,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            bun run tauri build --bundles appimage --config "$(scripts/appimage-pipewire.sh)"
+            bun run tauri build --bundles appimage --config "$(scripts/appimage-libs.sh)"
           else
             bun run tauri build --bundles nsis
           fi
