@@ -5,6 +5,7 @@ import { useUser } from "./lib/user";
 import { Home } from "./pages/Home";
 
 // LiveKit is most of the bundle, only load it inside a room
+const AdminPage = lazy(() => import("./pages/Admin").then((m) => ({ default: m.AdminPage })));
 const RoomPage = lazy(() => import("./pages/Room").then((m) => ({ default: m.RoomPage })));
 
 export function App() {
@@ -20,6 +21,11 @@ export function App() {
             <RoomPage id={params.id} />
           </Suspense>
         )}
+      </Route>
+      <Route path="/admin">
+        <Suspense>
+          <AdminPage />
+        </Suspense>
       </Route>
       <Route>
         <Home />

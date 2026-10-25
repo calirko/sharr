@@ -9,9 +9,16 @@ import { upsertDiscordUser } from "../users";
 // Holds state and the page to return to while the user is on Discord
 const COOKIE = "oauth";
 
-// Only paths on this site, never "//evil.com"
+// Only paths on this site. Parsed the way a browser does, so "/<tab>/evil.com" is caught too.
 function safeNext(next: string | undefined) {
-  return next && /^\/(?![/\\])/.test(next) ? next : "/";
+  if (!next || !next.startsWith("/")) return "/";
+  try {
+    const base = "http://sharr.invalid";
+    const url = new URL(next, base);
+    return url.origin === base ? url.pathname + url.search : "/";
+  } catch {
+    return "/";
+  }
 }
 
 export const authRoutes = new Hono<SessionEnv>()

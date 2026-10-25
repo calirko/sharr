@@ -1,4 +1,5 @@
-import { LogOut, Pencil } from "lucide-react";
+import { LogOut, Pencil, Shield } from "lucide-react";
+import { Link } from "wouter";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,13 @@ export function UserMenu({ onRename }: { onRename: () => void }) {
             <a href={discordLoginUrl()}>
               <DiscordIcon /> Log in with Discord
             </a>
+          </DropdownMenuItem>
+        )}
+        {user.is_admin && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin">
+              <Shield /> Admin
+            </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={logout}>

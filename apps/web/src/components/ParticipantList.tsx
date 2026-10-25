@@ -1,10 +1,19 @@
 import { useParticipants } from "@livekit/components-react";
-import { Crown, MonitorUp } from "lucide-react";
+import type { Participant } from "livekit-client";
+import { Crown, MonitorUp, UserX } from "lucide-react";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { ParticipantAvatar } from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 
-export function ParticipantList({ creatorId }: { creatorId: string }) {
+// canKick: the local user created the room
+export function ParticipantList({ roomId, creatorId, canKick }: { roomId: string; creatorId: string; canKick: boolean }) {
   const participants = useParticipants();
+
+  function kick(p: Participant) {
+    if (!confirm(`Remove ${p.name || p.identity} from the room?`)) return;
+    api.kick(roomId, p.identity).catch((err) => console.error("kick failed", err));
+  }
   // Owner first, then everyone in join order
   const sorted = [...participants].sort((a, b) => Number(b.identity === creatorId) - Number(a.identity === creatorId));
 
@@ -35,9 +44,14 @@ export function ParticipantList({ creatorId }: { creatorId: string }) {
               </span>
             )}
             {p.identity === creatorId && (
-              <span title="Owner" className="text-amber-400">
+              <span title="Owner" className="text-primary">
                 <Crown className="size-3.5" />
               </span>
+            )}
+            {canKick && !p.isLocal && (
+              <Button variant="ghost" size="icon-xs" title="Remove from room" onClick={() => kick(p)}>
+                <UserX />
+              </Button>
             )}
           </li>
         ))}

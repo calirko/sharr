@@ -4,11 +4,20 @@ function required(name: string): string {
   return value;
 }
 
+const sessionSecret = required("SESSION_SECRET");
+const production = process.env.NODE_ENV === "production";
+if (production && (sessionSecret.length < 32 || sessionSecret === "change-me")) {
+  throw new Error("SESSION_SECRET must be at least 32 characters in production");
+}
+if (production && process.env.LIVEKIT_API_KEY === "devkey") {
+  throw new Error("LIVEKIT_API_KEY is still the dev default");
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 3000),
-  production: process.env.NODE_ENV === "production",
+  production,
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
-  sessionSecret: required("SESSION_SECRET"),
+  sessionSecret,
   livekit: {
     // Public signaling URL handed to clients
     url: required("LIVEKIT_URL"),

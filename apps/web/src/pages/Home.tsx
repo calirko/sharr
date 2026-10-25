@@ -62,7 +62,7 @@ export function Home() {
                 href={`/r/${room.id}`}
                 className="hover:bg-foreground/4 flex min-w-0 flex-1 items-center gap-2 rounded-l-lg px-4 py-3 transition-colors"
               >
-                <span className="flex-1 truncate font-semibold">
+                <span className="font-display flex-1 truncate font-semibold">
                   {room.name}
                 </span>
                 {room.has_pin && (

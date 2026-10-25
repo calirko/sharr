@@ -2,12 +2,13 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { discordEnabled } from "../config";
+import { cleanName, limitByIp } from "../guard";
 import { createGuestSession, destroySession, publicUser, requireSession, setNickname, type SessionEnv } from "../session";
 
-export const nicknameSchema = z.string().trim().min(1).max(32);
+export const nicknameSchema = z.string().max(64).transform(cleanName).pipe(z.string().min(1).max(32));
 
 export const sessionRoutes = new Hono<SessionEnv>()
-  .post("/guest", zValidator("json", z.object({ nickname: nicknameSchema })), async (c) => {
+  .post("/guest", limitByIp("guest", 10, 3600), zValidator("json", z.object({ nickname: nicknameSchema })), async (c) => {
     const old = c.get("session");
     if (old) await destroySession(c, old);
     const session = await createGuestSession(c, c.req.valid("json").nickname);

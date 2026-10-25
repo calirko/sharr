@@ -45,9 +45,10 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [ ] Create the Discord app, add `https://sharr.calirko.com/api/auth/discord/callback` as redirect, set `DISCORD_*` in Dokploy, test login on prod
 
 ## M5 — Admin
-- [ ] Admin CLI (`grant` / `revoke` `isAdmin`), talks to Redis directly
-- [ ] Admin API with server-side flag check on every route
-- [ ] `/admin` page: live rooms and participants, kick, close, users
+- [x] Admin CLI (`list`, `grant` / `revoke` `is_admin`), talks to Redis directly
+- [x] Admin API with server-side flag check on every route
+- [x] `/admin` page: live rooms and participants, kick, close, users (tested locally with a faked Discord session)
+- [ ] Grant the first admin on prod and check the page there
 
 ## M6 — Hardening
 - [ ] Rate limits on login/join/PIN attempts

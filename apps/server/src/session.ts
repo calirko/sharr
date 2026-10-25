@@ -2,7 +2,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { config } from "./config";
 import { randomId, redis } from "./redis";
-import { avatarUrl, getUser, setUserNickname, type User } from "./users";
+import { avatarUrl, getUser, isAdmin, setUserNickname, type User } from "./users";
 
 export type Session = {
   sid: string;
@@ -16,8 +16,12 @@ export type Session = {
 
 export type SessionEnv = { Variables: { session: Session | null } };
 
-const COOKIE = "sid";
-const TTL_SECONDS = 60 * 60 * 24 * 30;
+// __Host- stops sibling subdomains from planting a cookie. It needs Secure, so prod only.
+const COOKIE = config.production ? "__Host-sid" : "sid";
+const DISCORD_TTL = 60 * 60 * 24 * 30;
+// Guests are temporary, so their sessions don't pile up in Redis
+const GUEST_TTL = 60 * 60 * 24;
+const ttlFor = (kind: Session["kind"]) => (kind === "discord" ? DISCORD_TTL : GUEST_TTL);
 
 const key = (sid: string) => `session:${sid}`;
 
@@ -36,7 +40,7 @@ export const sessionMiddleware: MiddlewareHandler<SessionEnv> = async (c, next) 
         }
       }
       if (session.kind !== "discord" || session.user) {
-        await redis.expire(key(sid), TTL_SECONDS);
+        await redis.expire(key(sid), ttlFor(session.kind));
         c.set("session", session);
       }
     }
@@ -49,18 +53,26 @@ export const requireSession: MiddlewareHandler<SessionEnv> = async (c, next) => 
   await next();
 };
 
+// Checked on every request. The flag is read fresh from the user record.
+export const requireAdmin: MiddlewareHandler<SessionEnv> = async (c, next) => {
+  const session = c.get("session");
+  if (!session) return c.json({ error: "not_logged_in" }, 401);
+  if (!isAdmin(session.user)) return c.json({ error: "not_found" }, 404);
+  await next();
+};
+
 async function createSession(c: Context, fields: Omit<Session, "sid" | "created_at">): Promise<Session> {
   const session: Session = { sid: randomId(24), ...fields, created_at: String(Date.now()) };
   const { sid, user, ...data } = session;
   // Discord nicknames live on the user record
   await redis.hset(key(sid), user ? { ...data, nickname: "" } : data);
-  await redis.expire(key(sid), TTL_SECONDS);
+  await redis.expire(key(sid), ttlFor(session.kind));
   await setSignedCookie(c, COOKIE, sid, config.sessionSecret, {
     httpOnly: true,
     secure: config.production,
     sameSite: "Lax",
     path: "/",
-    maxAge: TTL_SECONDS,
+    maxAge: ttlFor(session.kind),
   });
   return session;
 }
@@ -101,5 +113,6 @@ export function publicUser(session: Session) {
     nickname: session.nickname,
     discord_username: u?.discord_username ?? "",
     avatar_url: u ? avatarUrl(u) : "",
+    is_admin: isAdmin(u),
   };
 }

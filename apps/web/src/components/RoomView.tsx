@@ -87,7 +87,7 @@ export function RoomView({ room, info, onRoomChange }: Props) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-13 shrink-0 items-center gap-2 border-b px-3">
-        <h1 className="min-w-0 flex-1 truncate font-semibold">{room.name}</h1>
+        <h1 className="font-display min-w-0 flex-1 truncate text-lg font-semibold">{room.name}</h1>
         <div className="flex items-center gap-2">
           {canShare && screens.length > 0 && <ShareButton />}
           <CopyLinkButton roomId={room.id} roomName={room.name} />
@@ -152,7 +152,7 @@ export function RoomView({ room, info, onRoomChange }: Props) {
             >
               <ResizablePanelGroup orientation="vertical" {...sidebarLayout}>
                 <ResizablePanel id="people" defaultSize="30%" minSize="3rem">
-                  <ParticipantList creatorId={room.creator_id} />
+                  <ParticipantList roomId={room.id} creatorId={room.creator_id} canKick={info.is_creator} />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
                 <ResizablePanel id="chat" minSize="6rem" className="flex flex-col">

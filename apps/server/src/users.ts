@@ -1,3 +1,4 @@
+import { cleanName } from "./guard";
 import { redis } from "./redis";
 
 // Only Discord users get a record. Guests live in their session alone.
@@ -31,7 +32,7 @@ export async function upsertDiscordUser(profile: { id: string; username: string;
   const user: User = {
     user_id: id,
     ...fields,
-    nickname: (profile.global_name || profile.username).slice(0, 32),
+    nickname: cleanName(profile.global_name || profile.username).slice(0, 32) || "user",
     is_admin: "0",
     created_at: String(Date.now()),
   };
@@ -46,4 +47,24 @@ export async function setUserNickname(id: string, nickname: string) {
 
 export function avatarUrl(user: Pick<User, "discord_id" | "avatar">) {
   return user.avatar ? `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.png?size=128` : "";
+}
+
+export function isAdmin(user: User | undefined) {
+  return user?.is_admin === "1";
+}
+
+export async function setAdmin(id: string, admin: boolean) {
+  await redis.hset(key(id), { is_admin: admin ? "1" : "0" });
+}
+
+export async function listUsers(): Promise<User[]> {
+  const ids: string[] = [];
+  let cursor = "0";
+  do {
+    const [next, keys] = (await redis.send("SCAN", [cursor, "MATCH", "user:*", "COUNT", "500"])) as [string, string[]];
+    cursor = next;
+    ids.push(...keys.map((k) => k.slice("user:".length)));
+  } while (cursor !== "0");
+  const users = await Promise.all(ids.map(getUser));
+  return users.filter((u): u is User => u !== null).sort((a, b) => Number(b.created_at) - Number(a.created_at));
 }

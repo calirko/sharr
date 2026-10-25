@@ -6,6 +6,7 @@
     "dev": "bun --filter server --filter web dev",
     "dev:server": "bun --filter server dev",
     "dev:web": "bun --filter web dev",
-    "build": "bun --filter '*' build"
+    "build": "bun --filter '*' build",
+    "admin": "cd apps/server && bun run admin"
   }
 }

@@ -1,14 +1,20 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { bodyLimit } from "hono/body-limit";
+import { secureHeaders } from "hono/secure-headers";
 import { config } from "./config";
+import { sameOrigin } from "./guard";
 import { startRoomSweeper } from "./expiry";
 import { redis } from "./redis";
+import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
 import { roomRoutes } from "./routes/rooms";
 import { sessionRoutes } from "./routes/session";
 import { sessionMiddleware, type SessionEnv } from "./session";
 
 const api = new Hono<SessionEnv>();
+api.use(bodyLimit({ maxSize: 8 * 1024, onError: (c) => c.json({ error: "too_large" }, 413) }));
+api.use(sameOrigin);
 
 api.get("/health", async (c) => {
   await redis.send("PING", []);
@@ -19,9 +25,30 @@ api.use(sessionMiddleware);
 api.route("/auth", authRoutes);
 api.route("/session", sessionRoutes);
 api.route("/rooms", roomRoutes);
+api.route("/admin", adminRoutes);
 api.all("*", (c) => c.json({ error: "not_found" }, 404));
 
 const app = new Hono();
+const livekitOrigin = new URL(config.livekit.url).origin;
+app.use(
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https://cdn.discordapp.com"],
+      mediaSrc: ["'self'", "blob:", "mediastream:"],
+      connectSrc: ["'self'", livekitOrigin, livekitOrigin.replace(/^http/, "ws"), livekitOrigin.replace(/^ws/, "http")],
+      workerSrc: ["'self'", "blob:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
+    },
+    xFrameOptions: "DENY",
+    permissionsPolicy: { displayCapture: ["self"] },
+  }),
+);
 app.route("/api", api);
 
 // Web build. Unknown paths get index.html so client routes like /r/:id work on reload.

@@ -13,7 +13,7 @@ export function Logo({ className, textClassName }: { className?: string; textCla
   return (
     <span className={cn("flex items-center gap-2", className)}>
       <LogoMark />
-      <span className={cn("text-xl font-extrabold tracking-tight", textClassName)}>sharr</span>
+      <span className={cn("font-display text-xl font-bold tracking-tight", textClassName)}>sharr</span>
     </span>
   );
 }

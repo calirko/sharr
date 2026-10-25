@@ -95,7 +95,10 @@ end
 
 export async function claimName(roomId: string, identity: string, base: string, liveNames: string[]) {
   const args = [identity, base, String(Date.now()), String(NAME_HOLD_MS), ...liveNames];
-  return (await redis.send("EVAL", [CLAIM_SCRIPT, "1", namesKey(roomId), ...args])) as string;
+  const name = (await redis.send("EVAL", [CLAIM_SCRIPT, "1", namesKey(roomId), ...args])) as string;
+  // Holds only matter for NAME_HOLD_MS, so the table can go away on its own
+  await redis.send("EXPIRE", [namesKey(roomId), "300"]);
+  return name;
 }
 
 export function publicRoom(room: Room, participants = 0) {

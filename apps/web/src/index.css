@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
 
 @custom-variant dark (&:is(.dark *));
 /* Side-by-side room layout: wide screens, and phones turned sideways */
@@ -55,6 +56,7 @@
 
 @theme inline {
   --font-sans: "Inter Variable", sans-serif;
+  --font-display: "Space Grotesk Variable", sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
