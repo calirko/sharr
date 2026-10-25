@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CenterStack, TopBar } from "@/components/Layout";
 import { LogoMark } from "@/components/Logo";
-import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 
@@ -123,20 +123,20 @@ export function ActivityPage() {
       <TopBar>
         <LogoMark />
         <h1 className="font-display min-w-0 flex-1 truncate text-lg font-semibold">{room ?? "sharr"}</h1>
-        {shares.length > 1 && (
-          <div className="flex min-w-0 gap-1 overflow-x-auto">
-            {shares.map((s) => (
-              <Button
-                key={s.id}
-                size="sm"
-                variant={s.id === selected?.id ? "secondary" : "ghost"}
-                onClick={() => wsRef.current?.send(`select:${s.id}`)}
-              >
-                <UserAvatar name={s.name} url={avatarUrl(s.avatar_url)} className="size-5 text-[0.625rem]" />
-                <span className="max-w-32 truncate">{s.name}</span>
-              </Button>
-            ))}
-          </div>
+        {shares.length > 1 && selected && (
+          <Select value={String(selected.id)} onValueChange={(id) => wsRef.current?.send(`select:${id}`)}>
+            <SelectTrigger size="sm" className="max-w-48 min-w-0 shrink">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="end">
+              {shares.map((s) => (
+                <SelectItem key={s.id} value={String(s.id)}>
+                  <UserAvatar name={s.name} url={avatarUrl(s.avatar_url)} className="size-5 text-[0.625rem]" />
+                  <span className="truncate">{s.name}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </TopBar>
       <main className="flex min-h-0 flex-1 flex-col p-2">
