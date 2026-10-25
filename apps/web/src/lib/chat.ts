@@ -1,6 +1,8 @@
 import { useParticipants, useRoomContext } from "@livekit/components-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "./api";
 import { playSound } from "./sounds";
+import { useUser } from "./user";
 
 const TOPIC = "lk.chat";
 
@@ -58,9 +60,12 @@ export function useRoomChat() {
   const room = useRoomContext();
   const participants = useParticipants();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const names = useRef(new Map<string, string>());
-  for (const p of participants) names.current.set(p.identity, p.name || p.identity);
+  const people = useRef(new Map<string, { name: string; avatar: string }>());
+  for (const p of participants) {
+    people.current.set(p.identity, { name: p.name || p.identity, avatar: p.attributes.avatar_url ?? "" });
+  }
 
+  const { user } = useUser();
   const sendLimit = useRef(createLimiter(RATE_MAX, RATE_WINDOW_MS));
 
   const append = useCallback((msg: ChatMessage) => {
@@ -97,10 +102,13 @@ export function useRoomChat() {
       if (!sendLimit.current(room.localParticipant.identity)) throw new RateLimitedError();
       await room.localParticipant.sendText(text, { topic: TOPIC });
       append({ kind: "message", id: localId(), identity: room.localParticipant.identity, text, timestamp: Date.now() });
+      // Discord users' messages go to the backlog. Best effort, chat works without it.
+      if (user?.kind === "discord") api.logMessage(room.name, text).catch(() => {});
     },
-    [room, append],
+    [room, append, user?.kind],
   );
 
-  const nameOf = (identity: string) => names.current.get(identity) ?? "...";
-  return { messages, send, nameOf };
+  const nameOf = (identity: string) => people.current.get(identity)?.name ?? "...";
+  const avatarOf = (identity: string) => people.current.get(identity)?.avatar ?? "";
+  return { messages, send, nameOf, avatarOf };
 }

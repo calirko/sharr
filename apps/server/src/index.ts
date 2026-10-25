@@ -3,6 +3,7 @@ import { serveStatic } from "hono/bun";
 import { config } from "./config";
 import { startRoomSweeper } from "./expiry";
 import { redis } from "./redis";
+import { authRoutes } from "./routes/auth";
 import { roomRoutes } from "./routes/rooms";
 import { sessionRoutes } from "./routes/session";
 import { sessionMiddleware, type SessionEnv } from "./session";
@@ -15,6 +16,7 @@ api.get("/health", async (c) => {
 });
 
 api.use(sessionMiddleware);
+api.route("/auth", authRoutes);
 api.route("/session", sessionRoutes);
 api.route("/rooms", roomRoutes);
 api.all("*", (c) => c.json({ error: "not_found" }, 404));

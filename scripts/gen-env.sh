@@ -20,7 +20,7 @@ LIVEKIT_API_URL=http://localhost:7880
 
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
-DISCORD_REDIRECT_URI=https://sharr.calirko.com/auth/discord/callback
+DISCORD_REDIRECT_URI=https://sharr.calirko.com/api/auth/discord/callback
 
 REDIS_URL=redis://localhost:6379
 PORT=3000

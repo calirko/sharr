@@ -2,6 +2,7 @@ import { AudioTrack, useTracks, VideoTrack, type TrackReference } from "@livekit
 import { RemoteTrackPublication, Track, VideoQuality } from "livekit-client";
 import { Maximize, MonitorUp, Play, Settings, Volume1, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { ParticipantAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -73,7 +74,7 @@ export function ScreenGrid({ tracks }: { tracks: TrackReference[] }) {
     );
   } else {
     content = (
-      <div className={cn("grid min-h-0 flex-1 gap-2", tracks.length > 1 && "md:grid-cols-2")}>
+      <div className={cn("grid min-h-0 flex-1 gap-2", tracks.length > 1 && "side:grid-cols-2")}>
         {tracks.map((t) =>
           tile(t, "min-h-0", tracks.length > 1 ? () => setFocusSid(t.publication.trackSid) : undefined),
         )}
@@ -169,9 +170,9 @@ function Tile({ trackRef, className, onClick, volume, onVolume, quality, onQuali
           touchedAt || menuOpen ? "opacity-100" : "pointer-coarse:pointer-events-none",
         )}
       >
-        <span className="flex h-8 min-w-0 items-center rounded-lg bg-black/60 px-2.5 text-xs text-white">
-          <span className="truncate">
-          {local ? "You" : trackRef.participant.name || trackRef.participant.identity}</span>
+        <span className="flex h-8 min-w-0 items-center gap-2 rounded-lg bg-black/60 pr-2.5 pl-1.5 text-xs text-white">
+          <ParticipantAvatar participant={trackRef.participant} className="size-5 bg-white/20 text-[0.625rem] text-white" />
+          <span className="truncate">{local ? "You" : trackRef.participant.name || trackRef.participant.identity}</span>
         </span>
         <div className="flex-1" />
         {volume && (

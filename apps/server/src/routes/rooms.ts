@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { allowMessage, logMessage, MAX_LENGTH } from "../chatlog";
 import { config } from "../config";
 import { listParticipantsSafe, mintToken, permissionFor, roomService } from "../livekit";
 import {
@@ -14,7 +15,7 @@ import {
   removeRoom,
   updateRoom,
 } from "../rooms";
-import { requireSession, type SessionEnv } from "../session";
+import { publicUser, requireSession, type SessionEnv } from "../session";
 
 const shareMode = z.enum(["creator", "everyone"]);
 
@@ -92,6 +93,32 @@ export const roomRoutes = new Hono<SessionEnv>()
     const share = canShare(room, session.user_id);
 
     await updateRoom(room.id, { last_active_at: String(Date.now()) });
-    const token = await mintToken({ room: room.id, identity: session.user_id, name, canShare: share });
+    const { discord_username, avatar_url } = publicUser(session);
+    const token = await mintToken({
+      room: room.id,
+      identity: session.user_id,
+      name,
+      canShare: share,
+      attributes: { discord_username, avatar_url },
+    });
     return c.json({ url: config.livekit.url, token, name, can_share: share, is_creator: isCreator });
+  })
+  // Chat backlog, Discord users only. Must be in the room on LiveKit.
+  .post("/:id/messages", zValidator("json", z.object({ text: z.string().trim().min(1).max(MAX_LENGTH) })), async (c) => {
+    const session = c.get("session")!;
+    if (!session.user) return c.json({ ok: true });
+    const room = await getRoom(c.req.param("id"));
+    if (!room) return c.json({ error: "not_found" }, 404);
+    const me = (await listParticipantsSafe(room.id)).find((p) => p.identity === session.user_id);
+    if (!me) return c.json({ error: "forbidden" }, 403);
+    if (!allowMessage(session.user_id)) return c.json({ error: "rate_limited" }, 429);
+    await logMessage({
+      room_id: room.id,
+      room_name: room.name,
+      user_id: session.user_id,
+      discord_id: session.user.discord_id,
+      name: me.name,
+      text: c.req.valid("json").text,
+    });
+    return c.json({ ok: true });
   });

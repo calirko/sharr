@@ -40,8 +40,9 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
   - iOS Safari in Low Power Mode leaves video paused without telling livekit-client; tiles now show a play button (fixed)
 
 ## M4 — Discord login + history
-- [ ] Discord OAuth2 (`identify` only), identity shown in rooms
-- [ ] Persist chat for logged-in users in Redis (backlog)
+- [x] Discord OAuth2 (`identify` only), identity shown in rooms (`@username`, avatar; guests get their first letter)
+- [x] Persist chat for logged-in users in Redis (backlog, `chat` stream)
+- [ ] Create the Discord app, add `https://sharr.calirko.com/api/auth/discord/callback` as redirect, set `DISCORD_*` in Dokploy, test login on prod
 
 ## M5 — Admin
 - [ ] Admin CLI (`grant` / `revoke` `isAdmin`), talks to Redis directly

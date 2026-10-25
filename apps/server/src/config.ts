@@ -19,5 +19,13 @@ export const config = {
   },
   // Relative to the server's working dir (apps/server)
   webDist: process.env.WEB_DIST ?? "../web/dist",
+  // Optional. Without it only guest login is offered.
+  discord: {
+    clientId: process.env.DISCORD_CLIENT_ID ?? "",
+    clientSecret: process.env.DISCORD_CLIENT_SECRET ?? "",
+    redirectUri: process.env.DISCORD_REDIRECT_URI ?? "",
+  },
   roomIdleMinutes: Number(process.env.ROOM_IDLE_MINUTES ?? 30),
 };
+
+export const discordEnabled = Boolean(config.discord.clientId && config.discord.clientSecret && config.discord.redirectUri);

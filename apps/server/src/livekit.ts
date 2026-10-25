@@ -17,10 +17,18 @@ export function permissionFor(canShare: boolean): ParticipantPermission {
   } as ParticipantPermission;
 }
 
-export async function mintToken(opts: { room: string; identity: string; name: string; canShare: boolean }) {
+// Attributes come from the token only (no canUpdateOwnMetadata), so other clients can trust them
+export async function mintToken(opts: {
+  room: string;
+  identity: string;
+  name: string;
+  canShare: boolean;
+  attributes: Record<string, string>;
+}) {
   const at = new AccessToken(config.livekit.apiKey, config.livekit.apiSecret, {
     identity: opts.identity,
     name: opts.name,
+    attributes: opts.attributes,
     ttl: "10m",
   });
   const p = permissionFor(opts.canShare);
@@ -31,6 +39,7 @@ export async function mintToken(opts: { room: string; identity: string; name: st
     canPublishData: p.canPublishData,
     canPublish: p.canPublish,
     canPublishSources: p.canPublishSources,
+    canUpdateOwnMetadata: false,
   });
   return at.toJwt();
 }

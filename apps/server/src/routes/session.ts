@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { discordEnabled } from "../config";
 import { createGuestSession, destroySession, publicUser, requireSession, setNickname, type SessionEnv } from "../session";
 
 export const nicknameSchema = z.string().trim().min(1).max(32);
@@ -20,7 +21,7 @@ export const sessionRoutes = new Hono<SessionEnv>()
   })
   .get("/me", (c) => {
     const session = c.get("session");
-    return c.json({ user: session ? publicUser(session) : null });
+    return c.json({ user: session ? publicUser(session) : null, discord_enabled: discordEnabled });
   })
   .delete("/", async (c) => {
     const session = c.get("session");
