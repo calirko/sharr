@@ -44,10 +44,11 @@ app.use(
       workerSrc: ["'self'", "blob:"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
-      frameAncestors: ["'none'"],
+      // Discord Activities frame the app (through their discordsays.com proxy)
+      frameAncestors: ["https://discord.com", "https://*.discord.com", "https://*.discordsays.com"],
       formAction: ["'self'"],
     },
-    xFrameOptions: "DENY",
+    xFrameOptions: false,
     permissionsPolicy: { displayCapture: ["self"] },
   }),
 );

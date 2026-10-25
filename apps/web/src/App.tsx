@@ -9,9 +9,17 @@ import { Home } from "./pages/Home";
 // LiveKit is most of the bundle, only load it inside a room
 const AdminPage = lazy(() => import("./pages/Admin").then((m) => ({ default: m.AdminPage })));
 const RoomPage = lazy(() => import("./pages/Room").then((m) => ({ default: m.RoomPage })));
+const ActivityPage = lazy(() => import("./pages/Activity").then((m) => ({ default: m.ActivityPage })));
 
 export function App() {
   const { user, loading } = useUser();
+  // Inside a Discord Activity, Discord serves us from its own proxy domain
+  if (location.hostname.endsWith(".discordsays.com"))
+    return (
+      <Suspense>
+        <ActivityPage />
+      </Suspense>
+    );
   if (loading) return null;
   // Works logged out too, it offers the Discord login itself
   if (location.pathname === "/desktop-login") return <DesktopLoginPage />;
