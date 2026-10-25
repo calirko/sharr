@@ -1,7 +1,8 @@
 import { Logo } from "@/components/Logo";
-import { DoorOpen, Lock, Plus, Users } from "lucide-react";
+import { DoorOpen, Lock, Plus, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { CenterStack, TopBar } from "@/components/Layout";
 import { CreateRoomDialog } from "@/components/CreateRoomDialog";
@@ -17,6 +18,7 @@ export function Home() {
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState<Room | null>(null);
 
   useEffect(() => {
     const load = () =>
@@ -64,6 +66,9 @@ export function Home() {
                       </Badge>
                     </Link>
                     <CopyLinkButton roomId={room.id} roomName={room.name} compact />
+                    <Button variant="ghost" size="icon" title="Delete room" onClick={() => setDeleting(room)}>
+                      <Trash2 />
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -77,6 +82,19 @@ export function Home() {
 
       {creating && <CreateRoomDialog open onOpenChange={setCreating} />}
       {renaming && <RenameDialog open onOpenChange={setRenaming} />}
+      {deleting && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title="Delete room"
+          description={`${deleting.name} will close and everyone in it is disconnected.`}
+          confirmLabel="Delete"
+          confirmIcon={Trash2}
+          onConfirm={() =>
+            api.closeRoom(deleting.id).then(() => setRooms((rs) => rs && rs.filter((r) => r.id !== deleting.id)))
+          }
+        />
+      )}
     </div>
   );
 }
