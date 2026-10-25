@@ -1,4 +1,4 @@
-import { AudioPresets, Track, type LocalParticipant } from "livekit-client";
+import { AudioPresets, LocalVideoTrack, Track, type LocalParticipant } from "livekit-client";
 import { MAX_HEIGHT, MAX_WIDTH, qualityTiers, type Fps, type QualityId } from "./quality";
 
 export async function startShare(lp: LocalParticipant, quality: QualityId, fps: Fps) {
@@ -16,10 +16,7 @@ export async function startShare(lp: LocalParticipant, quality: QualityId, fps: 
   try {
     for (const track of tracks) {
       if (track.kind === Track.Kind.Video) {
-        // Browsers treat the capture size as a hint. Hard cap it so big monitors get scaled down.
-        await track.mediaStreamTrack
-          .applyConstraints({ width: { max: MAX_WIDTH }, height: { max: MAX_HEIGHT }, frameRate: { max: fps } })
-          .catch(() => {});
+        await capCapture(track.mediaStreamTrack, fps);
         await lp.publishTrack(track, {
           source: Track.Source.ScreenShare,
           screenShareEncoding: { maxBitrate: tier.bitrate, maxFramerate: fps },
@@ -40,6 +37,34 @@ export async function startShare(lp: LocalParticipant, quality: QualityId, fps: 
     tracks.forEach((t) => t.stop());
     throw err;
   }
+}
+
+// Browsers treat the capture size as a hint. Hard cap it so big monitors get scaled down.
+function capCapture(track: MediaStreamTrack, fps: Fps) {
+  return track
+    .applyConstraints({ width: { max: MAX_WIDTH }, height: { max: MAX_HEIGHT }, frameRate: { ideal: fps, max: fps } })
+    .catch(() => {});
+}
+
+// Change quality while sharing, without asking for the screen again
+export async function updateShare(lp: LocalParticipant, quality: QualityId, fps: Fps) {
+  const tier = qualityTiers.find((t) => t.id === quality) ?? qualityTiers[1];
+  const track = lp.getTrackPublication(Track.Source.ScreenShare)?.track;
+  if (!(track instanceof LocalVideoTrack) || !track.sender) return;
+  await capCapture(track.mediaStreamTrack, fps);
+
+  const params = track.sender.getParameters();
+  // The full size layer gets the tier bitrate. Simulcast layers below it keep theirs, capped at the new fps.
+  const top = params.encodings.reduce((a, b) => ((b.scaleResolutionDownBy ?? 1) < (a.scaleResolutionDownBy ?? 1) ? b : a));
+  for (const e of params.encodings) {
+    if (e === top) {
+      e.maxBitrate = tier.bitrate;
+      e.maxFramerate = fps;
+    } else if (e.maxFramerate === undefined || e.maxFramerate > fps) {
+      e.maxFramerate = fps;
+    }
+  }
+  await track.sender.setParameters(params);
 }
 
 export async function stopShare(lp: LocalParticipant) {

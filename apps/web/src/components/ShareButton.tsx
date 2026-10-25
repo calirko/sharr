@@ -1,5 +1,5 @@
 import { useLocalParticipant } from "@livekit/components-react";
-import { MonitorOff, MonitorUp } from "lucide-react";
+import { MonitorOff, MonitorUp, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,7 +17,7 @@ import {
   type Fps,
   type QualityId,
 } from "@/lib/quality";
-import { startShare, stopShare } from "@/lib/share";
+import { startShare, stopShare, updateShare } from "@/lib/share";
 
 export function ShareButton() {
   const { localParticipant, isScreenShareEnabled } = useLocalParticipant();
@@ -30,21 +30,14 @@ export function ShareButton() {
   // Phones can watch but not share
   if (!canCaptureScreen()) return null;
 
-  if (isScreenShareEnabled) {
-    return (
-      <Button variant="destructive" size="sm" onClick={() => stopShare(localParticipant)}>
-        <MonitorOff /> <span className="hidden sm:inline">Stop</span>
-      </Button>
-    );
-  }
-
-  async function start() {
+  async function submit() {
     setBusy(true);
     setError("");
     saveQuality(quality);
     saveFps(fps);
     try {
-      await startShare(localParticipant, quality, fps);
+      if (isScreenShareEnabled) await updateShare(localParticipant, quality, fps);
+      else await startShare(localParticipant, quality, fps);
       setOpen(false);
     } catch (err) {
       // Closing the browser picker is not an error worth showing
@@ -56,14 +49,29 @@ export function ShareButton() {
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <MonitorUp /> <span className="hidden sm:inline">Share</span>
-      </Button>
+      {isScreenShareEnabled ? (
+        <>
+          <Button variant="ghost" size="icon" title="Share quality" onClick={() => setOpen(true)}>
+            <SlidersHorizontal />
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => stopShare(localParticipant)}>
+            <MonitorOff /> <span className="hidden sm:inline">Stop</span>
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" onClick={() => setOpen(true)}>
+          <MonitorUp /> <span className="hidden sm:inline">Share</span>
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Share screen</DialogTitle>
-            <DialogDescription>Up to 1080p. Tab or system audio is shared if you allow it.</DialogDescription>
+            <DialogTitle>{isScreenShareEnabled ? "Share quality" : "Share screen"}</DialogTitle>
+            <DialogDescription>
+              {isScreenShareEnabled
+                ? "Applies right away, no need to stop sharing."
+                : "Up to 1080p. Tab or system audio is shared if you allow it."}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2">
             <Label>Quality</Label>
@@ -97,8 +105,8 @@ export function ShareButton() {
           </div>
           {error && <p className="text-destructive text-sm">{error}</p>}
           <DialogFooter>
-            <Button onClick={start} disabled={busy}>
-              Start sharing
+            <Button onClick={submit} disabled={busy}>
+              {isScreenShareEnabled ? "Apply" : "Start sharing"}
             </Button>
           </DialogFooter>
         </DialogContent>
