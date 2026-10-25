@@ -4,7 +4,8 @@ import { MAX_HEIGHT, MAX_WIDTH, qualityTiers, type Fps, type QualityId } from ".
 export async function startShare(lp: LocalParticipant, quality: QualityId, fps: Fps) {
   const tier = qualityTiers.find((t) => t.id === quality) ?? qualityTiers[1];
   const tracks = await lp.createScreenTracks({
-    audio: true,
+    // Voice processing is on by default and wrecks music and game audio
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 },
     systemAudio: "include",
     selfBrowserSurface: "exclude",
     surfaceSwitching: "include",

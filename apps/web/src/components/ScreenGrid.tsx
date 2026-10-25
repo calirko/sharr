@@ -86,6 +86,18 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
   const ref = useRef<HTMLDivElement>(null);
   const local = trackRef.participant.isLocal;
   const paused = useVideoPaused(ref);
+  // Touch screens have no hover: a tap shows the controls, and they hide again after a while
+  const [touchedAt, setTouchedAt] = useState(0);
+  useEffect(() => {
+    if (!touchedAt) return;
+    const t = setTimeout(() => setTouchedAt(0), 3000);
+    return () => clearTimeout(t);
+  }, [touchedAt]);
+
+  function click() {
+    if (matchMedia("(pointer: coarse)").matches && !touchedAt) return setTouchedAt(Date.now());
+    onClick?.();
+  }
 
   function fullscreen(e: React.MouseEvent) {
     e.stopPropagation();
@@ -104,7 +116,8 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
     <div
       ref={ref}
       className={cn("group relative overflow-hidden rounded-md bg-black", onClick && "cursor-pointer", className)}
-      onClick={onClick}
+      onClick={click}
+      onPointerDownCapture={(e) => e.pointerType !== "mouse" && touchedAt && setTouchedAt(Date.now())}
     >
       <VideoTrack trackRef={trackRef} className="size-full object-contain" />
       {paused && (
@@ -119,7 +132,12 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
           <Play className="size-12" />
         </button>
       )}
-      <div className="absolute inset-x-2 bottom-2 flex items-center gap-1">
+      <div
+        className={cn(
+          "absolute inset-x-2 bottom-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-has-[:focus-visible]:opacity-100",
+          touchedAt ? "opacity-100" : "pointer-coarse:pointer-events-none",
+        )}
+      >
         <span className="truncate rounded bg-black/60 px-2 py-0.5 text-xs text-white">
           {local ? "You" : trackRef.participant.name || trackRef.participant.identity}
         </span>
