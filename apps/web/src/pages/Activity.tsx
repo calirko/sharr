@@ -10,36 +10,53 @@ export function ActivityPage() {
   const set = (key: string, value: string) => setInfo((prev) => ({ ...prev, [key]: value }));
 
   useEffect(() => {
-    // Activities run on <client_id>.discordsays.com
-    const sdk = new DiscordSDK(location.hostname.split(".")[0]);
-    sdk
-      .ready()
-      .then(() => {
-        set("status", "ok");
-        set("platform", sdk.platform);
-        set("instance", sdk.instanceId);
-        set("channel", sdk.channelId ?? "-");
-      })
-      .catch((err) => set("status", `error: ${err?.message ?? err}`));
+    const onError = (e: ErrorEvent) => set("page error", e.message);
+    window.addEventListener("error", onError);
+
+    try {
+      // Activities run on <client_id>.discordsays.com
+      const sdk = new DiscordSDK(location.hostname.split(".")[0]);
+      sdk
+        .ready()
+        .then(() => {
+          set("status", "ok");
+          set("platform", sdk.platform);
+          set("instance", sdk.instanceId);
+          set("channel", sdk.channelId ?? "-");
+        })
+        .catch((err) => set("status", `error: ${err?.message ?? err}`));
+    } catch (err) {
+      set("status", `error: ${errText(err)}`);
+    }
 
     // A server reflexive candidate means STUN over UDP reached the internet
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-    const types = new Set<string>();
-    pc.onicecandidate = (e) => {
-      if (e.candidate?.type) types.add(e.candidate.type);
-    };
-    pc.createDataChannel("probe");
-    pc.createOffer()
-      .then((offer) => pc.setLocalDescription(offer))
-      .catch((err) => set("webrtc", `error: ${err?.message ?? err}`));
-    const timer = setTimeout(() => {
-      const found = [...types].join(", ") || "none";
-      set("webrtc", types.has("srflx") ? `ok (${found})` : `blocked? (${found})`);
-      pc.close();
-    }, 5000);
+    let pc: RTCPeerConnection | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const conn = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      pc = conn;
+      const types = new Set<string>();
+      conn.onicecandidate = (e) => {
+        if (e.candidate?.type) types.add(e.candidate.type);
+      };
+      conn.createDataChannel("probe");
+      conn
+        .createOffer()
+        .then((offer) => conn.setLocalDescription(offer))
+        .catch((err) => set("webrtc", `error: ${errText(err)}`));
+      timer = setTimeout(() => {
+        const found = [...types].join(", ") || "none";
+        set("webrtc", types.has("srflx") ? `ok (${found})` : `blocked? (${found})`);
+        conn.close();
+      }, 5000);
+    } catch (err) {
+      set("webrtc", `error: ${errText(err)}`);
+    }
+
     return () => {
+      window.removeEventListener("error", onError);
       clearTimeout(timer);
-      pc.close();
+      pc?.close();
     };
   }, []);
 
@@ -57,4 +74,8 @@ export function ActivityPage() {
       </CenterStack>
     </main>
   );
+}
+
+function errText(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
 }
