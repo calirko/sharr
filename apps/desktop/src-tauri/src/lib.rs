@@ -1,5 +1,6 @@
 #[cfg(target_os = "linux")]
 mod sysaudio;
+mod single;
 mod update;
 
 // Other platforms get system audio from the browser engine itself
@@ -67,6 +68,11 @@ fn cef() -> tauri_runtime_cef::Cef {
 }
 
 pub fn run() {
+    // CEF runs its helper processes from this binary too
+    let helper = std::env::args().any(|a| a.starts_with("--type="));
+    if !helper && !single::acquire() {
+        return;
+    }
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("sharr_lib=info")).init();
     let url = app_url();
 
@@ -89,6 +95,7 @@ pub fn run() {
             _ => PermissionResponse::Default,
         })
         .setup(move |app| {
+            log::info!("sharr {}", app.package_info().version);
             // Only the app's own origin gets IPC
             let origin = url.origin().ascii_serialization();
             app.add_capability(
@@ -118,9 +125,15 @@ pub fn run() {
                 })
                 .build()?;
 
+            single::set_app(app.handle().clone());
             update::spawn_check(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running sharr");
+        .build(tauri::generate_context!())
+        .expect("error while building sharr")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                update::install_on_exit(app);
+            }
+        });
 }

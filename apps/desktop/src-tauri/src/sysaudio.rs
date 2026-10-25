@@ -132,6 +132,10 @@ fn run(quit: pw::channel::Receiver<()>, ready: mpsc::Sender<Result<(), String>>)
                                     let state = state.clone();
                                     let core = core.clone();
                                     move |info| {
+                                        // Later events only carry what changed
+                                        if !info.change_mask().contains(pw::node::NodeChangeMask::PROPS) {
+                                            return;
+                                        }
                                         let pid = info
                                             .props()
                                             .and_then(|p| p.get("application.process.id"))
@@ -191,6 +195,11 @@ fn run(quit: pw::channel::Receiver<()>, ready: mpsc::Sender<Result<(), String>>)
     });
 
     mainloop.run();
+    // The info listeners hold the state that holds them. Break that so the connection closes,
+    // which takes the virtual source and its links with it.
+    let mut s = state.borrow_mut();
+    s.bound.clear();
+    s.links.clear();
     Ok(())
 }
 

@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-// A downloaded update waits here until the user restarts from the web app's toast
+// A downloaded update waits here until the user restarts from the web app's toast, or quits
 #[derive(Default)]
 pub struct Pending(Mutex<Option<(Update, Vec<u8>)>>);
 
@@ -41,4 +41,13 @@ pub fn update_install(app: AppHandle, pending: State<Pending>) -> Result<(), Str
     };
     update.install(bytes).map_err(|e| e.to_string())?;
     app.restart();
+}
+
+// Quitting with an update downloaded applies it, so the next start is up to date
+pub fn install_on_exit(app: &AppHandle) {
+    let Some((update, bytes)) = app.state::<Pending>().0.lock().unwrap().take() else { return };
+    log::info!("installing update {} on exit", update.version);
+    if let Err(err) = update.install(bytes) {
+        log::warn!("update install failed: {err}");
+    }
 }
