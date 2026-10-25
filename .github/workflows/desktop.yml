@@ -20,6 +20,8 @@ env:
 
 jobs:
   build:
+    # A version bump goes out with its tag, which builds it already
+    if: ${{ !(github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Desktop 0.')) }}
     strategy:
       fail-fast: false
       matrix:
