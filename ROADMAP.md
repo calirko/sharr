@@ -57,11 +57,13 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 
 ## M7 — Desktop app (Tauri, Linux + Windows)
 Main reason it exists: share system audio on Linux, which no browser can do (`getDisplayMedia` there only gives tab audio in Chrome, none in Firefox). Discord login is required, no guests.
-- [ ] Tauri shell in `apps/desktop` loading the web app from `https://sharr.calirko.com`
-- [ ] Discord login in the app: guests are not offered. Pick a flow that works in a webview (system browser plus deep link back, or OAuth inside the webview) and check Discord allows it
-- [ ] Server side: tell desktop clients apart only as far as needed (no new trust in the client)
-- [ ] Linux capture: xdg-desktop-portal ScreenCast + PipeWire for video, PipeWire monitor of the default output for system audio (exclude sharr's own playback so viewers don't hear an echo of the room)
-- [ ] Windows capture: Windows Graphics Capture for video, WASAPI loopback for system audio
-- [ ] Publish through the LiveKit Rust SDK (`NativeVideoSource` I420, `NativeAudioSource`), same 1080p60 cap and bitrate tiers as the web app (verify crate choices and versions first)
-- [ ] Check whether the webview's own `getDisplayMedia` is enough for video on each OS, and only go native where it isn't
+- [x] Tauri shell in `apps/desktop` loading the web app from `https://sharr.calirko.com`. WebKitGTK has no WebRTC, so it's Tauri 3 alpha with the CEF runtime (Chromium) on both OSes
+- [x] Discord login in the app: OAuth runs inside the window (navigation to `discord.com` allowed, other links open in the system browser), guests are not offered. Needs the real Discord app (M4) to test
+- [x] Server side: nothing needed. The web app only uses `window.__TAURI__` to adjust its UI
+- [x] Linux video: Chromium's `getDisplayMedia` (portal + PipeWire). Still needs a real share through the Hyprland portal picker
+- [x] Linux system audio: virtual PipeWire source fed by every app except sharr itself, captured by the page and published as the share's audio (tested locally: links, exclusion, cleanup, a viewer receives stereo 48 kHz)
+- [ ] Windows: system audio from Chromium's picker with `restrictOwnAudio`. Builds in CI, not run on Windows yet
+- [x] ~~Publish through the LiveKit Rust SDK~~ not needed: the app publishes through the same web code, so the 1080p60 cap and bitrate tiers are shared
+- [x] Webview `getDisplayMedia` is enough for video on both OSes (Chromium)
 - [ ] Signed auto-update via Tauri updater, CI builds + GitHub Releases on this public repo (Linux: AppImage)
+- [ ] Deploy the web changes (`lib/desktop.ts`, share audio path) to prod, then test the app against prod

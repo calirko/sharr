@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-M1 (server core) is done and deployed to prod (M2): `apps/server` has guest sessions, rooms with PINs, LiveKit token minting and idle room expiry. M3 (web app) is done and tested on prod (Chrome, Firefox, iOS Safari). M4 (Discord login, chat backlog) is built and tested locally with a faked Discord API; it still needs a real Discord app and a prod test. M5 (admin CLI, API and `/admin` page) is built and tested locally. `apps/desktop` is still empty. Commands below marked *(planned)* do not work yet.
+M1 (server core) is done and deployed to prod (M2): `apps/server` has guest sessions, rooms with PINs, LiveKit token minting and idle room expiry. M3 (web app) is done and tested on prod (Chrome, Firefox, iOS Safari). M4 (Discord login, chat backlog) is built and tested locally with a faked Discord API; it still needs a real Discord app and a prod test. M5 (admin CLI, API and `/admin` page) is built and tested locally. M7 (desktop app) is built: Linux system audio and the updater are tested locally, Windows only builds in CI so far (see `ROADMAP.md`).
 
 The server serves the web build (`apps/web/dist`, override with `WEB_DIST`) with an `index.html` fallback for client routes. The Dockerfile builds the web app in its own stage. Web routes: `/` (nickname, room list), `/r/:id` (room), `/admin` (admins only, linked from the user menu). Chat uses LiveKit text streams on topic `lk.chat` through our own hook (`apps/web/src/lib/chat.ts`), not `useChat`: messages can arrive before the sender's participant is known, and `useChat` then loses the sender for good. Spam limits (5 messages per 10s per sender, 1000 chars, collapsed blank lines) are enforced by every receiver in that hook, since the server never sees chat. Shadcn components live in `apps/web/src/components/ui` (add more with `bunx --bun shadcn@latest add <name>` from `apps/web`; check that it imports `cn` from `@/lib/utils`, it once pulled in an unrelated `cn` package).
 
@@ -51,7 +51,7 @@ Bun runtime and workspaces, **Hono** for the API, **React + Vite** (Tailwind, sh
 apps/server/   Bun API: Discord OAuth, guest sessions, rooms + PINs, LiveKit token minting, admin API + admin CLI
                (the admin page UI lives in apps/web under an /admin route)
 apps/web/      React + Vite + Tailwind + shadcn frontend (mobile + desktop)
-apps/desktop/  Tauri shell (Windows + Linux) wrapping the web app, plus native capture in src-tauri/ (Rust)
+apps/desktop/  Tauri shell (Windows + Linux) that loads the web app from prod, plus Linux system audio in src-tauri/ (Rust)
 infra/livekit/ livekit-server dev config (prod config is inline in docker-compose.yml `configs:`)
 docker-compose.yml, .env.example   (root)
 ```
@@ -72,11 +72,13 @@ Bun workspaces cover `apps/server` and `apps/web`. `apps/desktop/src-tauri` is a
 
 **Capture, by client:**
 - *Browser (web, mobile viewers):* `getDisplayMedia` via `livekit-client`. On Wayland, Chrome ≥110 and Firefox go through xdg-desktop-portal + PipeWire automatically; the portal backend (`xdg-desktop-portal-gnome`/`-kde`/`-wlr`) must be installed. Set `contentHint` (`motion` vs `detail`) and explicit `screenShareEncoding` (bitrate/fps) for quality; don't rely on defaults.
-- *Tauri desktop:* do not assume WebKitGTK's `getDisplayMedia` works on Linux (portal-dependent, historically unreliable in wry). Plan is native capture in Rust and publishing frames through the LiveKit Rust SDK (`NativeVideoSource`, I420 frames — convert from BGRA with its `yuv_helper`). Linux: xdg-desktop-portal ScreenCast + PipeWire (`ashpd` + `pipewire` crates are the likely candidates). Windows: Windows Graphics Capture (via the `windows` crate or a wrapper). **These crate choices are unverified — check current versions/maintenance before adopting.** Wayland cannot be captured any other way than portal + PipeWire; there is no X11-style fallback. The desktop app's main job is system audio on Linux, which browsers can't capture: a PipeWire monitor of the default output (leaving out sharr's own playback). Windows uses WASAPI loopback. Audio goes out through the Rust SDK's `NativeAudioSource`.
+- *Tauri desktop (built 2026-10-25):* WebKitGTK ships without WebRTC (checked: no `RTCPeerConnection` even with `enable-webrtc`), so the app uses **Tauri 3 alpha with its CEF runtime** (`tauri-runtime-cef`, Chromium 154) on both OSes and loads `https://sharr.calirko.com` in the window. It runs the same web build as the browser; desktop-only behavior is in `apps/web/src/lib/desktop.ts`, which checks for `window.__TAURI__` (IPC is granted to the app origin only). Video comes from Chromium's `getDisplayMedia` (portal + PipeWire on Wayland), so quality tiers and the 1080p60 cap are shared with the web. Linux system audio (`src-tauri/src/sysaudio.rs`): a virtual PipeWire source (`Audio/Source/Virtual`, like Vesktop's venmic) that links every `Stream/Output/Audio` node except our own (any descendant of the app's pid, read from the full node info, the registry leaves the pid out); the page captures it with `getUserMedia` and publishes it as `ScreenShareAudio`. The mic permission is auto-granted only while that source runs. Windows gets system audio from Chromium's own picker, with `restrictOwnAudio` to keep the room's playback out (untested). No LiveKit Rust SDK, no native video capture.
 
 ## Desktop releases and auto-update
 
-This repo is **public** and hosts the releases for both Windows and Linux (GitHub Releases). Auto-update is required: use Tauri's updater plugin with signed update artifacts (a signing keypair is needed; the private key and password live in CI secrets, never in the repo) and a CI workflow (e.g. `tauri-action`) that builds Windows + Linux on tag and publishes the release plus the updater manifest. Linux auto-update is believed to work only for the AppImage bundle — verify against current Tauri docs when setting it up. Since the repo is public, never commit `.env`, keys, or Discord secrets.
+This repo is **public** and hosts the releases for both Windows and Linux (GitHub Releases). `.github/workflows/desktop.yml` builds on pushes to the `desktop` branch and, on `desktop-v*` tags, publishes a release with the AppImage, the NSIS installer, their `.sig` files and `latest.json`. The tag must match `version` in `tauri.conf.json`. The updater reads `releases/latest/download/latest.json`, downloads in the background, offers a Restart toast in the web app and otherwise installs on quit. Linux auto-update only works for the AppImage (no deb: the bundler can't strip the CEF placeholders). Signing key: `~/.tauri/sharr.key` (+ `.password`) on the dev machine, and the `TAURI_SIGNING_PRIVATE_KEY` / `_PASSWORD` repo secrets; losing it means shipped apps can't update. Never commit `.env`, keys, or Discord secrets.
+
+Known workarounds in the build (Tauri 3 alpha): CEF 154 no longer ships `libEGL`/`libGLESv2`, which the bundler still copies, so CI creates empty placeholders. The AppImage tooling's helper sources moved upstream, so `ANYLINUX_LIB_SOURCE`/`GTK_CLASS_FIX_SOURCE` point at a pinned fork. The AppImage carries its own glibc and libpipewire, so `scripts/appimage-pipewire.sh` bundles the matching PipeWire client modules and libpulse, and the app points PipeWire at them (`use_bundled_pipewire`).
 
 ## Commands
 
@@ -90,7 +92,8 @@ cd apps/server && bun run typecheck
 bun run admin list|grant|revoke <discord-id|user-id>   # admin CLI; on prod: docker exec sharr bun run admin grant <discord-id>. The user must have logged in with Discord once.
 bun run dev:web              # Vite on :5173, proxies /api to :3000
 cd apps/web && bun run typecheck && bun run build   # build to apps/web/dist, which the server serves on :3000
-cd apps/desktop && cargo tauri dev   # (planned)
+cd apps/desktop && bun install && cargo build --manifest-path src-tauri/Cargo.toml   # desktop debug build
+SHARR_URL=http://localhost:3000 SHARR_DEVTOOLS_PORT=9222 apps/desktop/src-tauri/target/debug/sharr   # debug only: other server, CDP on 9222 (mock keyring)
 ```
 
 Copy `.env.example` to `.env` first. LiveKit runs with `use_external_ip: true` so it advertises the server's public IP; without that, clients behind NAT get unusable ICE candidates.

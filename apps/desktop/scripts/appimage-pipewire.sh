@@ -19,6 +19,6 @@ entry() {
   for p in $plugins; do
     entry "$dest/spa-0.2/support/$p.so" "$libdir/spa-0.2/support/$p.so"
   done
-  entry "$dest/config/client.conf" /usr/share/pipewire/client.conf
+  entry "$dest/config/client.conf" "$(cd "$(dirname "$0")" && pwd)/pipewire-client.conf"
   entry lib/libpulse.so.0 "$(readlink -f "$libdir/libpulse.so.0")"
 } | paste -sd, - | sed 's/^/{"bundle":{"linux":{"appimage":{"files":{/; s/$/}}}}}/'
