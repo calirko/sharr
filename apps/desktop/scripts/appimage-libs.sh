@@ -5,6 +5,7 @@
 # - PipeWire client modules and plugins, for system audio (the app points PipeWire at them)
 # - libpulse, which Chromium loads at runtime for audio output
 # - NSS's softokn and freebl, which NSS loads at runtime (Debian keeps them in nss/)
+# - Mesa and glvnd, which Chromium loads at runtime for GPU rendering (sharun finds them there)
 # Usage: tauri build --config "$(scripts/appimage-libs.sh)"
 set -e
 libdir=$(pkg-config --variable=libdir libpipewire-0.3)
@@ -31,4 +32,9 @@ entry() {
     # Debian's libnss3 looks in nss/ next to itself
     entry "lib/nss/$n" "$src"
   done
+  for f in "$libdir"/libEGL*.so.? "$libdir"/libGLX*.so.? "$libdir"/libGL.so.1 "$libdir"/libGLdispatch.so.0 \
+    "$libdir"/libGLESv2.so.2 "$libdir"/libgallium*.so "$libdir"/dri/*_dri.so; do
+    entry "lib/${f#"$libdir"/}" "$f"
+  done
+  entry share/glvnd/egl_vendor.d/50_mesa.json /usr/share/glvnd/egl_vendor.d/50_mesa.json
 } | paste -sd, - | sed 's/^/{"bundle":{"linux":{"appimage":{"files":{/; s/$/}}}}}/'
