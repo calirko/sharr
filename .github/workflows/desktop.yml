@@ -3,6 +3,9 @@ name: desktop
 on:
   push:
     tags: ["desktop-v*"]
+    # Build only, the release job needs a tag
+    branches: [desktop]
+    paths: ["apps/desktop/**", ".github/workflows/desktop.yml"]
   workflow_dispatch:
 
 permissions:
@@ -57,6 +60,8 @@ jobs:
       - name: CEF placeholders
         run: |
           for dir in "${CEF_PATH//\\//}"/*/cef_*; do
+            [ -d "$dir" ] || continue
+            ls "$dir"
             for f in libEGL.so libGLESv2.so libEGL.dll libGLESv2.dll; do
               case "$dir:$f" in *linux*:*.so|*windows*:*.dll) [ -e "$dir/$f" ] || : > "$dir/$f" ;; esac
             done
