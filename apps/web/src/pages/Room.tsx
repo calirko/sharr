@@ -79,6 +79,13 @@ export function RoomPage({ id }: { id: string }) {
     [navigate],
   );
 
+  // Must be stable: LiveKitRoom calls connect() again whenever onError changes,
+  // and that breaks a room that is mid-reconnect (common after a tab switch)
+  const onError = useCallback((err: Error) => {
+    console.error("livekit error", err);
+    setState({ kind: "ended", text: `Could not connect to the media server (${err.message}).`, rejoin: true });
+  }, []);
+
   if (state.kind === "loading") return null;
   if (state.kind === "pin") return <PinForm room={state.room} error={state.error} onSubmit={(pin) => join(state.room, pin)} />;
   if (state.kind === "ended") {
@@ -102,7 +109,7 @@ export function RoomPage({ id }: { id: string }) {
       connect
       options={{ adaptiveStream: true, dynacast: true }}
       onDisconnected={onDisconnected}
-      onError={() => setState({ kind: "ended", text: "Could not connect to the media server.", rejoin: true })}
+      onError={onError}
       className="h-dvh"
     >
       <RoomView
