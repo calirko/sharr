@@ -4207,7 +4207,9 @@ name = "sharr"
 version = "0.1.3"
 dependencies = [
  "env_logger",
+ "glib-sys",
  "interprocess",
+ "libc",
  "log",
  "pipewire",
  "serde",
@@ -4217,6 +4219,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-updater",
  "tauri-runtime-cef",
+ "tokio",
 ]
 
 [[package]]

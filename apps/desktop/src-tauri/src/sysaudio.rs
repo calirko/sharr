@@ -3,6 +3,7 @@
 // Creates a virtual PipeWire source and links every app's audio output into it, except sharr's
 // own playback (the room's audio), so viewers don't hear themselves back. The page captures the
 // source as a microphone and publishes it as the share's audio. Same idea as Vesktop's venmic.
+// Discord can be left out too, so a call doesn't end up in the share.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -17,39 +18,48 @@ use pw::types::ObjectType;
 /// What the page looks for in enumerateDevices()
 pub const LABEL: &str = "sharr system audio";
 
+enum Msg {
+    Quit,
+    IncludeDiscord(bool),
+}
+
 struct Running {
-    quit: pw::channel::Sender<()>,
+    tx: pw::channel::Sender<Msg>,
     thread: std::thread::JoinHandle<()>,
 }
+
+// Desktop Discord clients, matched on application.process.binary (lowercased)
+const DISCORD: &[&str] = &["discord", "discordcanary", "discordptb", "vesktop", "legcord", "webcord", "armcord"];
 
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 // Read from the permission handler on the main thread, which must never wait on RUNNING
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 
 // Async so the wait for PipeWire runs off the main thread
-#[tauri::command]
-pub async fn system_audio_start() -> Result<String, String> {
+#[tauri::command(rename_all = "snake_case")]
+pub async fn system_audio_start(include_discord: bool) -> Result<String, String> {
     let mut running = RUNNING.lock().unwrap();
-    if running.is_some() {
+    if let Some(r) = running.as_ref() {
+        let _ = r.tx.send(Msg::IncludeDiscord(include_discord));
         return Ok(LABEL.into());
     }
-    let (quit_tx, quit_rx) = pw::channel::channel();
+    let (tx, rx) = pw::channel::channel();
     let (ready_tx, ready_rx) = mpsc::channel();
     let thread = std::thread::spawn(move || {
-        if let Err(err) = run(quit_rx, ready_tx.clone()) {
+        if let Err(err) = run(rx, ready_tx.clone(), include_discord) {
             log::warn!("system audio stopped: {err}");
             let _ = ready_tx.send(Err(err.to_string()));
         }
     });
     match ready_rx.recv_timeout(Duration::from_secs(5)) {
         Ok(Ok(())) => {
-            *running = Some(Running { quit: quit_tx, thread });
+            *running = Some(Running { tx, thread });
             ACTIVE.store(true, Ordering::Relaxed);
             Ok(LABEL.into())
         }
         Ok(Err(err)) => Err(err),
         Err(_) => {
-            let _ = quit_tx.send(());
+            let _ = tx.send(Msg::Quit);
             Err("timeout".into())
         }
     }
@@ -59,8 +69,16 @@ pub async fn system_audio_start() -> Result<String, String> {
 pub async fn system_audio_stop() {
     ACTIVE.store(false, Ordering::Relaxed);
     if let Some(r) = RUNNING.lock().unwrap().take() {
-        let _ = r.quit.send(());
+        let _ = r.tx.send(Msg::Quit);
         let _ = r.thread.join();
+    }
+}
+
+/// Changes the Discord setting while sharing
+#[tauri::command(rename_all = "snake_case")]
+pub async fn system_audio_include_discord(include: bool) {
+    if let Some(r) = RUNNING.lock().unwrap().as_ref() {
+        let _ = r.tx.send(Msg::IncludeDiscord(include));
     }
 }
 
@@ -91,15 +109,20 @@ struct Port {
 #[derive(Default)]
 struct State {
     sink: Option<u32>,
-    // Nodes whose output goes into the sink
-    sources: HashMap<u32, ()>,
+    // Nodes whose output goes into the sink, and whether each is Discord
+    sources: HashMap<u32, bool>,
+    include_discord: bool,
     bound: HashMap<u32, (pw::node::Node, pw::node::NodeListener)>,
     ports: HashMap<u32, Port>,
     // Keyed by (output port, input port)
     links: HashMap<(u32, u32), pw::link::Link>,
 }
 
-fn run(quit: pw::channel::Receiver<()>, ready: mpsc::Sender<Result<(), String>>) -> Result<(), pw::Error> {
+fn run(
+    rx: pw::channel::Receiver<Msg>,
+    ready: mpsc::Sender<Result<(), String>>,
+    include_discord: bool,
+) -> Result<(), pw::Error> {
     pw::init();
     let mainloop = pw::main_loop::MainLoopRc::new(None)?;
     let context = pw::context::ContextRc::new(&mainloop, None)?;
@@ -119,7 +142,7 @@ fn run(quit: pw::channel::Receiver<()>, ready: mpsc::Sender<Result<(), String>>)
         },
     )?;
 
-    let state = Rc::new(RefCell::new(State::default()));
+    let state = Rc::new(RefCell::new(State { include_discord, ..Default::default() }));
     let ready = RefCell::new(Some(ready));
 
     let _listener = registry
@@ -149,14 +172,17 @@ fn run(quit: pw::channel::Receiver<()>, ready: mpsc::Sender<Result<(), String>>)
                                         if !info.change_mask().contains(pw::node::NodeChangeMask::PROPS) {
                                             return;
                                         }
-                                        let pid = info
-                                            .props()
+                                        let props = info.props();
+                                        let pid = props
                                             .and_then(|p| p.get("application.process.id"))
                                             .and_then(|p| p.parse().ok());
+                                        let discord = props
+                                            .and_then(|p| p.get("application.process.binary"))
+                                            .is_some_and(|b| DISCORD.contains(&b.to_lowercase().as_str()));
                                         let mut s = state.borrow_mut();
                                         if pid.is_some_and(is_ours) {
                                             s.sources.remove(&id);
-                                        } else if s.sources.insert(id, ()).is_none() {
+                                        } else if s.sources.insert(id, discord).is_none() {
                                             link_all(&mut s, &core);
                                         }
                                     }
@@ -202,9 +228,21 @@ fn run(quit: pw::channel::Receiver<()>, ready: mpsc::Sender<Result<(), String>>)
         })
         .register();
 
-    let _quit = quit.attach(mainloop.loop_(), {
+    let _rx = rx.attach(mainloop.loop_(), {
         let mainloop = mainloop.clone();
-        move |_| mainloop.quit()
+        let state = state.clone();
+        move |msg| match msg {
+            Msg::Quit => mainloop.quit(),
+            Msg::IncludeDiscord(include) => {
+                let mut s = state.borrow_mut();
+                s.include_discord = include;
+                if include {
+                    link_all(&mut s, &core);
+                } else {
+                    unlink_discord(&mut s, &core);
+                }
+            }
+        }
     });
 
     mainloop.run();
@@ -217,6 +255,10 @@ fn run(quit: pw::channel::Receiver<()>, ready: mpsc::Sender<Result<(), String>>)
 }
 
 impl State {
+    fn captured(&self, node: u32) -> bool {
+        self.sources.get(&node).is_some_and(|&discord| self.include_discord || !discord)
+    }
+
     fn sink_inputs(&self) -> Vec<(u32, Port)> {
         let Some(sink) = self.sink else { return vec![] };
         self.ports
@@ -234,7 +276,7 @@ fn link_all(s: &mut State, core: &pw::core::CoreRc) {
     let outputs: Vec<(u32, Port)> = s
         .ports
         .iter()
-        .filter(|(_, p)| p.output && s.sources.contains_key(&p.node))
+        .filter(|(_, p)| p.output && s.captured(p.node))
         .map(|(id, p)| (*id, p.clone()))
         .collect();
 
@@ -259,6 +301,20 @@ fn link_all(s: &mut State, core: &pw::core::CoreRc) {
                 }
                 Err(err) => log::warn!("link failed: {err}"),
             }
+        }
+    }
+}
+
+fn unlink_discord(s: &mut State, core: &pw::core::CoreRc) {
+    let drop: Vec<(u32, u32)> = s
+        .links
+        .keys()
+        .filter(|(out, _)| s.ports.get(out).is_some_and(|p| s.sources.get(&p.node) == Some(&true)))
+        .copied()
+        .collect();
+    for key in drop {
+        if let Some(link) = s.links.remove(&key) {
+            let _ = core.destroy_object(link);
         }
     }
 }
@@ -292,4 +348,24 @@ fn is_ours(mut pid: u32) -> bool {
         pid = ppid;
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Needs a PipeWire session. Plays nothing: watch the links from outside (pw-dump) while it runs.
+    #[test]
+    #[ignore]
+    fn discord_toggle() {
+        tauri::async_runtime::block_on(async {
+            assert_eq!(system_audio_start(false).await.as_deref(), Ok(LABEL));
+            std::thread::sleep(Duration::from_secs(3));
+            system_audio_include_discord(true).await;
+            std::thread::sleep(Duration::from_secs(3));
+            system_audio_include_discord(false).await;
+            std::thread::sleep(Duration::from_secs(3));
+            system_audio_stop().await;
+        });
+    }
 }

@@ -1,4 +1,5 @@
 use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -7,16 +8,24 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 #[derive(Default)]
 pub struct Pending(Mutex<Option<(Update, Vec<u8>)>>);
 
+// Downloads have been seen to stall with no error, so each try has a deadline
+const TRIES: u32 = 3;
+const TIMEOUT: Duration = Duration::from_secs(600);
+
 pub fn spawn_check(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        if let Err(err) = check(&app).await {
-            log::warn!("update check failed: {err}");
+        for attempt in 1..=TRIES {
+            match check(&app).await {
+                Ok(()) => return,
+                Err(err) => log::warn!("update check failed ({attempt}/{TRIES}): {err}"),
+            }
+            tokio::time::sleep(Duration::from_secs(30 * attempt as u64)).await;
         }
     });
 }
 
 async fn check(app: &AppHandle) -> tauri_plugin_updater::Result<()> {
-    let Some(update) = app.updater()?.check().await? else {
+    let Some(update) = app.updater_builder().timeout(TIMEOUT).build()?.check().await? else {
         log::info!("no update");
         return Ok(());
     };

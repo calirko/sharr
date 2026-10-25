@@ -11,17 +11,31 @@ const tauri = (window as unknown as { __TAURI__?: Tauri }).__TAURI__;
 
 export const isDesktop = !!tauri;
 
-export type DesktopInfo = { version: string; os: string };
-
-let info: Promise<DesktopInfo> | undefined;
-export const desktopInfo = () => (info ??= tauri!.core.invoke<DesktopInfo>("desktop_info"));
-
 // Browsers can't capture system audio on Linux. There the app mixes every other app's output
 // into a virtual source, which we capture like a microphone.
-export const hasNativeSystemAudio = async () => isDesktop && (await desktopInfo()).os === "linux";
+export const hasNativeSystemAudio = isDesktop && navigator.userAgent.includes("Linux");
+
+const DISCORD_KEY = "sharr.share_discord";
+
+// Whether Discord's audio (a call, say) goes into the share. On unless turned off.
+export function getIncludeDiscord() {
+  try {
+    return localStorage.getItem(DISCORD_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+// Also applies right away when sharing
+export function setIncludeDiscord(include: boolean) {
+  try {
+    localStorage.setItem(DISCORD_KEY, include ? "1" : "0");
+  } catch {}
+  tauri?.core.invoke("system_audio_include_discord", { include }).catch(() => {});
+}
 
 export async function systemAudioTrack() {
-  const label = await tauri!.core.invoke<string>("system_audio_start");
+  const label = await tauri!.core.invoke<string>("system_audio_start", { include_discord: getIncludeDiscord() });
   const find = async () =>
     (await navigator.mediaDevices.enumerateDevices()).find((d) => d.kind === "audioinput" && d.label === label);
 

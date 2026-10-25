@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { api, type Room, type ShareMode } from "@/lib/api";
+import { getIncludeDiscord, hasNativeSystemAudio, setIncludeDiscord } from "@/lib/desktop";
 import { errorText } from "@/lib/errors";
 import { getSoundPrefs, setSoundPrefs, type SoundPrefs } from "@/lib/sounds";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ type Props = {
 // Sounds are per person and shown to everyone. Room options are for the creator only.
 export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoomChange }: Props) {
   const [sounds, setSounds] = useState<SoundPrefs>(getSoundPrefs);
+  const [includeDiscord, setDiscord] = useState(getIncludeDiscord);
   const [confirmClose, setConfirmClose] = useState(false);
 
   function setSound(key: keyof SoundPrefs, on: boolean) {
@@ -73,6 +75,23 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
             <Switch id="sound-presence" checked={sounds.presence} onCheckedChange={(v) => setSound("presence", v)} />
           </div>
         </section>
+
+        {hasNativeSystemAudio && (
+          <section className="flex flex-col gap-3 border-t pt-4">
+            <h3 className="text-muted-foreground text-xs font-bold">Share audio</h3>
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="share-discord">Include Discord audio</Label>
+              <Switch
+                id="share-discord"
+                checked={includeDiscord}
+                onCheckedChange={(v) => {
+                  setDiscord(v);
+                  setIncludeDiscord(v);
+                }}
+              />
+            </div>
+          </section>
+        )}
 
         {isCreator && (
           <section className="flex flex-col gap-3 border-t pt-4">

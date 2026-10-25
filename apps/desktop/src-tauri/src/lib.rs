@@ -1,4 +1,6 @@
 #[cfg(target_os = "linux")]
+mod idlefix;
+#[cfg(target_os = "linux")]
 mod sysaudio;
 mod single;
 mod update;
@@ -6,9 +8,15 @@ mod update;
 // Other platforms get system audio from the browser engine itself
 #[cfg(not(target_os = "linux"))]
 mod sysaudio {
-    #[tauri::command]
-    pub fn system_audio_start() -> Result<String, String> {
+    #[tauri::command(rename_all = "snake_case")]
+    pub fn system_audio_start(include_discord: bool) -> Result<String, String> {
+        let _ = include_discord;
         Err("unsupported".into())
+    }
+
+    #[tauri::command(rename_all = "snake_case")]
+    pub fn system_audio_include_discord(include: bool) {
+        let _ = include;
     }
 
     #[tauri::command]
@@ -41,20 +49,6 @@ fn allowed_in_app(url: &Url, app: &Url) -> bool {
     url.origin() == app.origin()
         || url.host_str() == Some("discord.com")
         || url.scheme() == "about"
-}
-
-#[derive(serde::Serialize)]
-struct DesktopInfo {
-    version: String,
-    os: &'static str,
-}
-
-#[tauri::command]
-fn desktop_info(app: tauri::AppHandle) -> DesktopInfo {
-    DesktopInfo {
-        version: app.package_info().version.to_string(),
-        os: std::env::consts::OS,
-    }
 }
 
 fn cef() -> tauri_runtime_cef::Cef {
@@ -91,11 +85,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(update::Pending::default())
         .invoke_handler(tauri::generate_handler![
-            desktop_info,
             update::update_pending,
             update::update_install,
             sysaudio::system_audio_start,
             sysaudio::system_audio_stop,
+            sysaudio::system_audio_include_discord,
         ])
         // Only our origin can start system audio (IPC is scoped to it), so this lets in just that capture.
         // Don't touch the webview in here: this runs on the main thread and webview getters wait on it.
@@ -105,6 +99,10 @@ pub fn run() {
         })
         .setup(move |app| {
             log::info!("sharr {}", app.package_info().version);
+            #[cfg(target_os = "linux")]
+            if idlefix::destroy_chromium_work_source() == 0 {
+                log::warn!("Chromium's idle GLib source not found, the main thread may spin");
+            }
             // Only the app's own origin gets IPC
             let origin = url.origin().ascii_serialization();
             app.add_capability(
@@ -112,11 +110,11 @@ pub fn run() {
                     .remote(format!("{origin}/*"))
                     .window("main")
                     .permission("core:event:default")
-                    .permission("allow-desktop-info")
                     .permission("allow-update-pending")
                     .permission("allow-update-install")
                     .permission("allow-system-audio-start")
-                    .permission("allow-system-audio-stop"),
+                    .permission("allow-system-audio-stop")
+                    .permission("allow-system-audio-include-discord"),
             )?;
 
             update::spawn_check(app.handle().clone());
@@ -140,7 +138,7 @@ pub fn run() {
             #[cfg(all(debug_assertions, target_os = "linux"))]
             if std::env::var_os("SHARR_SYSAUDIO_TEST").is_some() {
                 tauri::async_runtime::spawn(async {
-                    log::info!("system audio test: {:?}", sysaudio::system_audio_start().await);
+                    log::info!("system audio test: {:?}", sysaudio::system_audio_start(true).await);
                 });
             }
 

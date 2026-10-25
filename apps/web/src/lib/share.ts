@@ -12,7 +12,7 @@ import { MAX_HEIGHT, MAX_WIDTH, qualityTiers, type Fps, type QualityId } from ".
 
 export async function startShare(lp: LocalParticipant, quality: QualityId, fps: Fps) {
   const tier = qualityTiers.find((t) => t.id === quality) ?? qualityTiers[1];
-  const native = await hasNativeSystemAudio();
+  const native = hasNativeSystemAudio;
   const tracks = await lp.createScreenTracks({
     // Voice processing is on by default and wrecks music and game audio.
     // restrictOwnAudio keeps the room's own playback out of system audio where Chrome supports it.
