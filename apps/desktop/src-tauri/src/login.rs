@@ -24,7 +24,9 @@ pub async fn browser_login(app: AppHandle, url: State<'_, AppUrl>) -> Result<Str
     link.query_pairs_mut().append_pair("port", &port.to_string()).append_pair("state", &state);
     app.opener().open_url(link.as_str(), None::<&str>).map_err(|e| e.to_string())?;
 
-    let code = tokio::time::timeout(WAIT, wait_for_code(&listener, &state))
+    let mut done = url.0.join("/desktop-login").map_err(|e| e.to_string())?;
+    done.set_query(Some("done=1"));
+    let code = tokio::time::timeout(WAIT, wait_for_code(&listener, &state, done.as_str()))
         .await
         .map_err(|_| "timeout".to_string())?;
 
@@ -35,9 +37,10 @@ pub async fn browser_login(app: AppHandle, url: State<'_, AppUrl>) -> Result<Str
     Ok(code)
 }
 
-// Answers requests until one carries our state and a code. Anything else (favicon, a stray
-// request, a code meant for another attempt) gets a 404 and is ignored.
-async fn wait_for_code(listener: &TcpListener, state: &str) -> String {
+// Answers requests until one carries our state and a code, and sends that one back to the web
+// app's "you're logged in" page. Anything else (favicon, a stray request, a code meant for
+// another attempt) gets a 404 and is ignored.
+async fn wait_for_code(listener: &TcpListener, state: &str, done: &str) -> String {
     loop {
         let Ok((mut conn, _)) = listener.accept().await else { continue };
         let Ok(Some(head)) = tokio::time::timeout(Duration::from_secs(5), read_head(&mut conn)).await else {
@@ -53,18 +56,10 @@ async fn wait_for_code(listener: &TcpListener, state: &str) -> String {
                 let get = |k: &str| u.query_pairs().find(|(key, _)| key == k).map(|(_, v)| v.into_owned());
                 (get("state").as_deref() == Some(state)).then(|| get("code")).flatten()
             });
-        let (status, body) = match &code {
-            Some(_) => ("200 OK", "You're logged in. You can close this tab and go back to sharr."),
-            None => ("404 Not Found", "Not found."),
+        let response = match &code {
+            Some(_) => format!("HTTP/1.1 302 Found\r\nLocation: {done}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+            None => "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
         };
-        let page = format!(
-            "<!doctype html><meta charset=utf-8><title>sharr</title>\
-             <body style=\"font:16px system-ui;display:grid;place-items:center;height:90vh\">{body}</body>"
-        );
-        let response = format!(
-            "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}",
-            page.len()
-        );
         let _ = conn.write_all(response.as_bytes()).await;
         if let Some(code) = code {
             return code;
@@ -118,9 +113,9 @@ mod tests {
                     get(port, "/?code=good&state=abc"),
                 ]
             });
-            assert_eq!(wait_for_code(&listener, "abc").await, "good");
+            assert_eq!(wait_for_code(&listener, "abc", "https://example.invalid/done").await, "good");
             let statuses = client.join().unwrap();
-            assert!(statuses[0].contains("404") && statuses[1].contains("404") && statuses[2].contains("200"));
+            assert!(statuses[0].contains("404") && statuses[1].contains("404") && statuses[2].contains("302"));
         });
     }
 }

@@ -1,4 +1,4 @@
-import { AppWindow, LogIn, Unlink, X } from "lucide-react";
+import { AppWindow, CircleCheck, LogIn, Unlink, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { DiscordIcon } from "@/components/DiscordIcon";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 // Opened in the system browser by the desktop app (apps/desktop/src-tauri/src/login.rs). Hands
 // the app a one-time code through its listener on 127.0.0.1, which it trades for a session.
+// The listener then sends the browser back here with ?done=1.
 export function DesktopLoginPage() {
   const { user, discordEnabled } = useUser();
   const [busy, setBusy] = useState(false);
@@ -23,15 +24,30 @@ export function DesktopLoginPage() {
     setBusy(true);
     try {
       const { code } = await api.desktopCode();
-      location.href = `http://127.0.0.1:${port}/?code=${encodeURIComponent(code)}&state=${state}`;
+      // replace() keeps the tab's history at one page, so it can still close itself at the end
+      location.replace(`http://127.0.0.1:${port}/?code=${encodeURIComponent(code)}&state=${state}`);
     } catch (err) {
       toast.error(errorText(err));
       setBusy(false);
     }
   }
 
+  // Browsers only let a page close a tab that has a single page of history
+  function closeTab() {
+    window.close();
+    setTimeout(() => toast("Your browser won't let this page close the tab. Close it yourself."), 300);
+  }
+
   let content;
-  if (!valid) {
+  if (params.get("done") === "1") {
+    content = (
+      <CenterStack icon={CircleCheck} text="You're logged in. Go back to the sharr app.">
+        <Button variant="outline" onClick={closeTab}>
+          <X /> Close tab
+        </Button>
+      </CenterStack>
+    );
+  } else if (!valid) {
     content = <CenterStack icon={Unlink} text="This login link is broken. Start again from the app." />;
   } else if (!discordEnabled) {
     content = <CenterStack icon={AppWindow} text="Discord login is not set up on this server." />;
