@@ -1,8 +1,9 @@
-import { ArrowLeft, Lock, MonitorUp, Shield, Trash2, Users, UserX } from "lucide-react";
+import { ArrowLeft, Lock, MonitorUp, Radio, SearchX, Shield, Trash2, Users, UserX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DiscordIcon } from "@/components/DiscordIcon";
+import { CenterStack, TopBar } from "@/components/Layout";
 import { Logo } from "@/components/Logo";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
@@ -52,19 +53,20 @@ export function AdminPage() {
 
   if (!user?.is_admin) {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-4 p-4 text-center">
-        <p>Page not found.</p>
-        <Button variant="outline" asChild>
-          <Link href="/">Back to rooms</Link>
-        </Button>
+      <main className="flex min-h-dvh flex-col justify-center p-4">
+        <CenterStack icon={SearchX} text="Page not found.">
+          <Button variant="outline" asChild>
+            <Link href="/">Back to rooms</Link>
+          </Button>
+        </CenterStack>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-6 p-4">
-      <header className="flex items-center justify-between gap-2">
-        <h1 className="flex items-center gap-3">
+    <div className="flex h-dvh flex-col">
+      <TopBar>
+        <h1 className="flex min-w-0 flex-1 items-center gap-3">
           <Logo />
           <Badge variant="secondary">
             <Shield /> Admin
@@ -75,46 +77,57 @@ export function AdminPage() {
             <ArrowLeft /> Rooms
           </Link>
         </Button>
-      </header>
+      </TopBar>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-muted-foreground text-sm font-bold">Rooms {rooms && `(${rooms.length})`}</h2>
-        {rooms?.length === 0 && <p className="text-muted-foreground py-6 text-center text-sm">No rooms.</p>}
-        <ul className="flex flex-col gap-2">
-          {rooms?.map((room) => (
-            <RoomItem
-              key={room.id}
-              room={room}
-              onClose={() => setPending({ kind: "close", room })}
-              onKick={(participant) => setPending({ kind: "kick", room, participant })}
-            />
-          ))}
-        </ul>
-      </section>
-
-      <section className="flex flex-col gap-2 pb-8">
-        <h2 className="text-muted-foreground text-sm font-bold">Discord users {users && `(${users.length})`}</h2>
-        {users?.length === 0 && <p className="text-muted-foreground py-6 text-center text-sm">No Discord users yet.</p>}
-        <ul className="flex flex-col divide-y rounded-lg border">
-          {users?.map((u) => (
-            <li key={u.user_id} className="flex items-center gap-3 px-4 py-2">
-              <UserAvatar name={u.nickname} url={u.avatar_url} className="size-8" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{u.nickname}</p>
-                <p className="text-muted-foreground truncate text-xs">
-                  @{u.discord_username} · {u.discord_id}
-                </p>
-              </div>
-              {u.is_admin && (
-                <Badge variant="secondary">
-                  <Shield /> Admin
-                </Badge>
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
+        <div className="m-auto flex w-full max-w-3xl flex-col gap-12 py-8">
+          {rooms && (
+            <CenterStack icon={Radio} text={rooms.length ? `Rooms (${rooms.length})` : "No rooms."}>
+              {rooms.length > 0 && (
+                <ul className="flex w-full flex-col gap-2 text-left">
+                  {rooms.map((room) => (
+                    <RoomItem
+                      key={room.id}
+                      room={room}
+                      onClose={() => setPending({ kind: "close", room })}
+                      onKick={(participant) => setPending({ kind: "kick", room, participant })}
+                    />
+                  ))}
+                </ul>
               )}
-              <span className="text-muted-foreground hidden text-xs sm:inline">joined {ago(u.created_at)}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+            </CenterStack>
+          )}
+
+          {users && (
+            <CenterStack
+              icon={Users}
+              text={users.length ? `Discord users (${users.length})` : "No Discord users yet."}
+            >
+              {users.length > 0 && (
+                <ul className="flex w-full flex-col divide-y rounded-lg border text-left">
+                  {users.map((u) => (
+                    <li key={u.user_id} className="flex items-center gap-3 px-4 py-2">
+                      <UserAvatar name={u.nickname} url={u.avatar_url} className="size-8" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{u.nickname}</p>
+                        <p className="text-muted-foreground truncate text-xs">
+                          @{u.discord_username} · {u.discord_id}
+                        </p>
+                      </div>
+                      {u.is_admin && (
+                        <Badge variant="secondary">
+                          <Shield /> Admin
+                        </Badge>
+                      )}
+                      <span className="text-muted-foreground hidden text-xs sm:inline">joined {ago(u.created_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CenterStack>
+          )}
+        </div>
+      </main>
 
       {pending && (
         <ConfirmDialog
@@ -135,7 +148,7 @@ export function AdminPage() {
               })}
         />
       )}
-    </main>
+    </div>
   );
 }
 

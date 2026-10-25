@@ -2,6 +2,7 @@ import { AudioTrack, useTracks, VideoTrack, type TrackReference } from "@livekit
 import { RemoteTrackPublication, Track, VideoQuality } from "livekit-client";
 import { Maximize, MonitorUp, Play, Settings, Volume1, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CenterStack } from "@/components/Layout";
 import { ParticipantAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,13 +57,9 @@ export function ScreenGrid({ tracks, emptyAction }: { tracks: TrackReference[]; 
   const focused = tracks.find((t) => t.publication.trackSid === focusSid);
   if (tracks.length === 0) {
     content = (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-        <div className="bg-foreground/5 text-muted-foreground flex size-14 items-center justify-center rounded-full">
-          <MonitorUp className="size-6" />
-        </div>
-        <p className="text-muted-foreground text-sm">Nobody is sharing yet.</p>
+      <CenterStack icon={MonitorUp} text="Nobody is sharing yet." className="flex-1 justify-center">
         {emptyAction}
-      </div>
+      </CenterStack>
     );
   } else if (focused && tracks.length > 1) {
     content = (

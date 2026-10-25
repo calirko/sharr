@@ -58,7 +58,7 @@ export function NicknameForm() {
           <p className="text-muted-foreground text-sm">Discord login is not set up on this server.</p>
         )}
         {discordEnabled && (
-          <Button asChild className="bg-[#5865F2] text-white hover:bg-[#4752C4]">
+          <Button asChild variant="outline">
             <a href={discordLoginUrl()}>
               <DiscordIcon /> Log in with Discord
             </a>
