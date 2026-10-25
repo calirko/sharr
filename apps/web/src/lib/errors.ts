@@ -10,6 +10,8 @@ const messages: Record<string, string> = {
   too_many_attempts: "Too many wrong PINs. Try again later.",
   too_many_rooms: "You have too many rooms. Close one first.",
   not_logged_in: "Your session expired. Reload the page.",
+  bad_code: "That login expired. Try again.",
+  discord_only: "Log in with Discord first.",
 };
 
 export function errorText(err: unknown) {

@@ -1,6 +1,7 @@
 // Bridge to the desktop app (apps/desktop). The same web build runs in the browser and in the app;
 // the app injects window.__TAURI__ for this origin only.
 import { toast } from "sonner";
+import { api } from "./api";
 
 type Tauri = {
   core: { invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> };
@@ -63,6 +64,12 @@ export async function systemAudioTrack() {
     },
   });
   return stream.getAudioTracks()[0];
+}
+
+// Discord login runs in the system browser, which sends the app a one-time code (/desktop-login)
+export async function browserLogin() {
+  const code = await tauri!.core.invoke<string>("browser_login");
+  return (await api.desktopRedeem(code)).user;
 }
 
 export const stopSystemAudio = () => tauri?.core.invoke("system_audio_stop").catch(() => {});

@@ -3,6 +3,7 @@ import { Route, Switch } from "wouter";
 import { NicknameForm } from "./components/NicknameForm";
 import { isDesktop } from "./lib/desktop";
 import { useUser } from "./lib/user";
+import { DesktopLoginPage } from "./pages/DesktopLogin";
 import { Home } from "./pages/Home";
 
 // LiveKit is most of the bundle, only load it inside a room
@@ -12,6 +13,8 @@ const RoomPage = lazy(() => import("./pages/Room").then((m) => ({ default: m.Roo
 export function App() {
   const { user, loading } = useUser();
   if (loading) return null;
+  // Works logged out too, it offers the Discord login itself
+  if (location.pathname === "/desktop-login") return <DesktopLoginPage />;
   if (!user || (isDesktop && user.kind === "guest")) return <NicknameForm />;
 
   return (

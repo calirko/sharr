@@ -4207,6 +4207,7 @@ name = "sharr"
 version = "0.1.4"
 dependencies = [
  "env_logger",
+ "getrandom 0.3.4",
  "glib-sys",
  "interprocess",
  "libc",

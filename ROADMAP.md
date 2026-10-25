@@ -58,7 +58,7 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 ## M7 — Desktop app (Tauri, Linux + Windows)
 Main reason it exists: share system audio on Linux, which no browser can do (`getDisplayMedia` there only gives tab audio in Chrome, none in Firefox). Discord login is required, no guests.
 - [x] Tauri shell in `apps/desktop` loading the web app from `https://sharr.calirko.com`. WebKitGTK has no WebRTC, so it's Tauri 3 alpha with the CEF runtime (Chromium) on both OSes
-- [x] Discord login in the app: OAuth runs inside the window (navigation to `discord.com` allowed, other links open in the system browser), guests are not offered. Needs the real Discord app (M4) to test
+- [x] Discord login in the app: done in the system browser, which hands the app a one-time code over a `127.0.0.1` listener (`/desktop-login`). Guests are not offered. Needs the real Discord app (M4) to test end to end
 - [x] Server side: nothing needed. The web app only uses `window.__TAURI__` to adjust its UI
 - [x] Linux video: Chromium's `getDisplayMedia` (portal + PipeWire). Still needs a real share through the Hyprland portal picker
 - [x] Linux system audio: virtual PipeWire source fed by every app except sharr itself, captured by the page and published as the share's audio (tested locally: links, exclusion, cleanup, a viewer receives stereo 48 kHz)

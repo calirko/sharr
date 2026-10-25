@@ -2,6 +2,7 @@
 mod idlefix;
 #[cfg(target_os = "linux")]
 mod sysaudio;
+mod login;
 mod single;
 mod update;
 
@@ -44,11 +45,9 @@ fn app_url() -> Url {
     url.parse().expect("invalid app url")
 }
 
-// Discord's login page has to open in the app so the session cookie lands here
+// Everything else, Discord login included, opens in the system browser (see login.rs)
 fn allowed_in_app(url: &Url, app: &Url) -> bool {
-    url.origin() == app.origin()
-        || url.host_str() == Some("discord.com")
-        || url.scheme() == "about"
+    url.origin() == app.origin() || url.scheme() == "about"
 }
 
 fn cef() -> tauri_runtime_cef::Cef {
@@ -84,9 +83,11 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .manage(update::Pending::default())
+        .manage(login::AppUrl(url.clone()))
         .invoke_handler(tauri::generate_handler![
             update::update_pending,
             update::update_install,
+            login::browser_login,
             sysaudio::system_audio_start,
             sysaudio::system_audio_stop,
             sysaudio::system_audio_include_discord,
@@ -112,6 +113,7 @@ pub fn run() {
                     .permission("core:event:default")
                     .permission("allow-update-pending")
                     .permission("allow-update-install")
+                    .permission("allow-browser-login")
                     .permission("allow-system-audio-start")
                     .permission("allow-system-audio-stop")
                     .permission("allow-system-audio-include-discord"),

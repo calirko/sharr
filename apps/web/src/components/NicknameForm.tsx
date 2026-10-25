@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { api, discordLoginUrl } from "@/lib/api";
-import { isDesktop } from "@/lib/desktop";
+import { browserLogin, isDesktop } from "@/lib/desktop";
 import { errorText } from "@/lib/errors";
 import { useUser } from "@/lib/user";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ export function NicknameForm() {
   const { setUser, discordEnabled } = useUser();
   const [nickname, setNickname] = useState("");
   const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState(false);
 
   useEffect(() => {
     if (new URLSearchParams(location.search).get("login") === "failed") {
@@ -30,6 +31,17 @@ export function NicknameForm() {
     } catch (err) {
       toast.error(errorText(err));
       setBusy(false);
+    }
+  }
+
+  // Clicking again starts over, in case the browser tab was closed
+  async function desktopLogin() {
+    setWaiting(true);
+    try {
+      setUser(await browserLogin());
+    } catch (err) {
+      toast.error(errorText(err));
+      setWaiting(false);
     }
   }
 
@@ -58,7 +70,15 @@ export function NicknameForm() {
         {isDesktop && !discordEnabled && (
           <p className="text-muted-foreground text-sm">Discord login is not set up on this server.</p>
         )}
-        {discordEnabled && (
+        {discordEnabled && isDesktop && (
+          <>
+            <Button type="button" variant="outline" onClick={desktopLogin}>
+              <DiscordIcon /> Log in with Discord
+            </Button>
+            {waiting && <p className="text-muted-foreground text-sm">Finish logging in in your browser.</p>}
+          </>
+        )}
+        {discordEnabled && !isDesktop && (
           <Button asChild variant="outline">
             <a href={discordLoginUrl()}>
               <DiscordIcon /> Log in with Discord
