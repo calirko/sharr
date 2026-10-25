@@ -102,6 +102,7 @@ jobs:
         run: |
           # Artifacts keep their bundle folders
           find dist -mindepth 2 -type f -exec mv {} dist/ \;
+          find dist -mindepth 1 -type d -delete
           version=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
           [ "desktop-v$version" = "$TAG" ] || { echo "tag $TAG does not match version $version"; exit 1; }
           appimage=$(cd dist && ls *.AppImage)
