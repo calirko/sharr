@@ -1,5 +1,6 @@
 import { useParticipants } from "@livekit/components-react";
 import { Crown, MonitorUp } from "lucide-react";
+import { DiscordIcon } from "@/components/DiscordIcon";
 import { ParticipantAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 
@@ -17,11 +18,14 @@ export function ParticipantList({ creatorId }: { creatorId: string }) {
             <ParticipantAvatar participant={p} />
             <span className="min-w-0 truncate">
               {p.name || p.identity}
-              {p.attributes.discord_username && (
-                <span className="text-muted-foreground"> @{p.attributes.discord_username}</span>
-              )}
+
               {p.isLocal && <span className="text-muted-foreground"> (you)</span>}
             </span>
+            {p.attributes.discord_username && (
+              <span title={`Discord: ${p.attributes.discord_username}`} className="text-[#5865F2]">
+                <DiscordIcon className="size-3.5" />
+              </span>
+            )}
             {p.identity === creatorId && (
               <Badge>
                 <Crown /> Owner

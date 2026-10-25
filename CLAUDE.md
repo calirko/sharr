@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Writing (code comments, docs, UI text, commit messages): avoid AI-sounding characters and phrasing. No em dashes, no long obvious sentences, no filler. Keep it short and plain.
 - Naming: camelCase for functions and objects, snake_case for data (DB fields, JSON payloads, env-style keys).
-- Icons: Lucide icons only.
+- Icons: Lucide icons only. Exception: the Discord logo (`DiscordIcon`, inline SVG from simple-icons), since Lucide has no brand icons.
 - Fonts: Inter only, for now.
 
 ## Status

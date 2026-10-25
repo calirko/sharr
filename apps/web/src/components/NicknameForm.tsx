@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn } from "lucide-react";
+import { DiscordIcon } from "@/components/DiscordIcon";
 import { api, discordLoginUrl } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { useUser } from "@/lib/user";
@@ -47,9 +47,9 @@ export function NicknameForm() {
           Continue as guest
         </Button>
         {discordEnabled && (
-          <Button variant="outline" asChild>
+          <Button asChild className="bg-[#5865F2] text-white hover:bg-[#4752C4]">
             <a href={discordLoginUrl()}>
-              <LogIn /> Log in with Discord
+              <DiscordIcon /> Log in with Discord
             </a>
           </Button>
         )}

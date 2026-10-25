@@ -1,4 +1,5 @@
-import { LogIn, LogOut, Pencil } from "lucide-react";
+import { LogOut, Pencil } from "lucide-react";
+import { DiscordIcon } from "@/components/DiscordIcon";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,8 +31,14 @@ export function UserMenu({ onRename }: { onRename: () => void }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel className="text-muted-foreground font-normal">
-          {user.kind === "discord" ? `@${user.discord_username}` : "Guest"}
+        <DropdownMenuLabel className="text-muted-foreground flex items-center gap-2 font-normal">
+          {user.kind === "discord" ? (
+            <>
+              <DiscordIcon /> {user.discord_username}
+            </>
+          ) : (
+            "Guest"
+          )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onRename}>
@@ -40,7 +47,7 @@ export function UserMenu({ onRename }: { onRename: () => void }) {
         {user.kind === "guest" && discordEnabled && (
           <DropdownMenuItem asChild>
             <a href={discordLoginUrl()}>
-              <LogIn /> Log in with Discord
+              <DiscordIcon /> Log in with Discord
             </a>
           </DropdownMenuItem>
         )}
