@@ -1,4 +1,22 @@
+#[cfg(target_os = "linux")]
+mod sysaudio;
 mod update;
+
+// Other platforms get system audio from the browser engine itself
+#[cfg(not(target_os = "linux"))]
+mod sysaudio {
+    #[tauri::command]
+    pub fn system_audio_start() -> Result<String, String> {
+        Err("unsupported".into())
+    }
+
+    #[tauri::command]
+    pub fn system_audio_stop() {}
+
+    pub fn is_running() -> bool {
+        false
+    }
+}
 
 use tauri::ipc::CapabilityBuilder;
 use tauri::webview::{PermissionKind, PermissionResponse};
@@ -61,17 +79,14 @@ pub fn run() {
             desktop_info,
             update::update_pending,
             update::update_install,
+            sysaudio::system_audio_start,
+            sysaudio::system_audio_stop,
         ])
-        .on_permission_request({
-            let url = url.clone();
-            move |webview, kind| {
-                let ours = webview.url().map(|u| u.origin() == url.origin()).unwrap_or(false);
-                match kind {
-                    // System audio comes in as a microphone (see sysaudio)
-                    PermissionKind::Microphone if ours => PermissionResponse::Allow,
-                    _ => PermissionResponse::Default,
-                }
-            }
+        // Only our origin can start system audio (IPC is scoped to it), so this lets in just that capture.
+        // Don't touch the webview in here: this runs on the main thread and webview getters wait on it.
+        .on_permission_request(|_, kind| match kind {
+            PermissionKind::Microphone if sysaudio::is_running() => PermissionResponse::Allow,
+            _ => PermissionResponse::Default,
         })
         .setup(move |app| {
             // Only the app's own origin gets IPC
@@ -83,7 +98,9 @@ pub fn run() {
                     .permission("core:event:default")
                     .permission("allow-desktop-info")
                     .permission("allow-update-pending")
-                    .permission("allow-update-install"),
+                    .permission("allow-update-install")
+                    .permission("allow-system-audio-start")
+                    .permission("allow-system-audio-stop"),
             )?;
 
             let handle = app.handle().clone();

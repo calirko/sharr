@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { api, discordLoginUrl } from "@/lib/api";
+import { isDesktop } from "@/lib/desktop";
 import { errorText } from "@/lib/errors";
 import { useUser } from "@/lib/user";
 import { toast } from "sonner";
@@ -35,19 +36,27 @@ export function NicknameForm() {
     <main className="flex min-h-dvh items-center justify-center p-4">
       <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-4">
         <Logo className="gap-3" textClassName="text-3xl" />
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="nickname">Nickname</Label>
-          <Input
-            id="nickname"
-            autoFocus
-            maxLength={32}
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-          />
-        </div>
-        <Button type="submit" disabled={busy || !nickname.trim()}>
-          Continue as guest
-        </Button>
+        {/* The desktop app is for Discord users only */}
+        {!isDesktop && (
+          <>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="nickname">Nickname</Label>
+              <Input
+                id="nickname"
+                autoFocus
+                maxLength={32}
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={busy || !nickname.trim()}>
+              Continue as guest
+            </Button>
+          </>
+        )}
+        {isDesktop && !discordEnabled && (
+          <p className="text-muted-foreground text-sm">Discord login is not set up on this server.</p>
+        )}
         {discordEnabled && (
           <Button asChild className="bg-[#5865F2] text-white hover:bg-[#4752C4]">
             <a href={discordLoginUrl()}>

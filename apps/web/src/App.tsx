@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Switch } from "wouter";
 import { NicknameForm } from "./components/NicknameForm";
+import { isDesktop } from "./lib/desktop";
 import { useUser } from "./lib/user";
 import { Home } from "./pages/Home";
 
@@ -11,7 +12,7 @@ const RoomPage = lazy(() => import("./pages/Room").then((m) => ({ default: m.Roo
 export function App() {
   const { user, loading } = useUser();
   if (loading) return null;
-  if (!user) return <NicknameForm />;
+  if (!user || (isDesktop && user.kind === "guest")) return <NicknameForm />;
 
   return (
     <Switch>
