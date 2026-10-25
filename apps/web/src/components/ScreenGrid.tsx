@@ -138,8 +138,9 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
           touchedAt ? "opacity-100" : "pointer-coarse:pointer-events-none",
         )}
       >
-        <span className="truncate rounded bg-black/60 px-2 py-0.5 text-xs text-white">
-          {local ? "You" : trackRef.participant.name || trackRef.participant.identity}
+        <span className="flex h-8 min-w-0 items-center rounded-lg bg-black/60 px-2.5 text-xs text-white">
+          <span className="truncate">
+          {local ? "You" : trackRef.participant.name || trackRef.participant.identity}</span>
         </span>
         <div className="flex-1" />
         {volume && (
@@ -149,7 +150,7 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
               variant="ghost"
               size="icon-sm"
               title={silent ? "Unmute" : "Mute"}
-              className="text-white hover:bg-white/20 hover:text-white"
+              className="rounded-lg text-white hover:bg-white/20 hover:text-white"
               onClick={() => onVolume({ level: volume.level || 1, muted: !silent })}
             >
               <VolumeIcon />
@@ -172,7 +173,7 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
           variant="ghost"
           size="icon-sm"
           title="Fullscreen"
-          className="text-white hover:bg-white/20 hover:text-white"
+          className="rounded-lg bg-black/60 text-white hover:bg-white/20 hover:text-white"
           onClick={fullscreen}
         >
           <Maximize />
