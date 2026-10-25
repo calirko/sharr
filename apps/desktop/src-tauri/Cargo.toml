@@ -29,7 +29,6 @@ pipewire = "0.10"
 glib-sys = "0.22"
 libc = "0.2"
 
+# No LTO: it barely changes the size next to Chromium and makes release builds much slower
 [profile.release]
-lto = true
-codegen-units = 1
 strip = true

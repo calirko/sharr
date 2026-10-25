@@ -3,8 +3,9 @@ name: desktop
 on:
   push:
     tags: ["desktop-v*"]
-    # Build only, the release job needs a tag
-    branches: [desktop]
+    # Build only, the release job needs a tag. Tag runs can only restore caches saved on main,
+    # so building main also keeps their Rust cache warm.
+    branches: [main]
     paths: ["apps/desktop/**", ".github/workflows/desktop.yml"]
   workflow_dispatch:
 
