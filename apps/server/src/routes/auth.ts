@@ -31,15 +31,24 @@ export const authRoutes = new Hono<SessionEnv>()
     if (!discordEnabled) return c.json({ error: "not_found" }, 404);
     const saved = await getSignedCookie(c, config.sessionSecret, COOKIE);
     deleteCookie(c, COOKIE, { path: "/api/auth" });
-    if (!saved) return c.redirect("/?login=failed");
+    if (!saved) {
+      console.error("discord login: no oauth cookie (expired, or blocked by the browser)");
+      return c.redirect("/?login=failed");
+    }
     const sep = saved.indexOf("|");
     const state = saved.slice(0, sep);
     const next = safeNext(saved.slice(sep + 1));
 
     // Cancelled on Discord's side
-    if (c.req.query("error")) return c.redirect(next);
+    if (c.req.query("error")) {
+      console.log(`discord login: ${c.req.query("error")} ${c.req.query("error_description") ?? ""}`);
+      return c.redirect(next);
+    }
     const code = c.req.query("code");
-    if (!code || c.req.query("state") !== state) return c.redirect("/?login=failed");
+    if (!code || c.req.query("state") !== state) {
+      console.error(`discord login: ${code ? "state mismatch" : "no code"}`);
+      return c.redirect("/?login=failed");
+    }
 
     try {
       const user = await upsertDiscordUser(await fetchProfile(code));
