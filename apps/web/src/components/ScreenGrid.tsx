@@ -1,7 +1,7 @@
 import { AudioTrack, useTracks, VideoTrack, type TrackReference } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { Maximize, MonitorUp, Volume1, Volume2, VolumeX } from "lucide-react";
-import { useRef, useState } from "react";
+import { Maximize, MonitorUp, Play, Volume1, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -85,6 +85,7 @@ type TileProps = {
 function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
   const ref = useRef<HTMLDivElement>(null);
   const local = trackRef.participant.isLocal;
+  const paused = useVideoPaused(ref);
 
   function fullscreen(e: React.MouseEvent) {
     e.stopPropagation();
@@ -106,6 +107,18 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
       onClick={onClick}
     >
       <VideoTrack trackRef={trackRef} className="size-full object-contain" />
+      {paused && (
+        <button
+          className="absolute inset-0 flex items-center justify-center bg-black/40 text-white"
+          title="Play"
+          onClick={(e) => {
+            e.stopPropagation();
+            ref.current?.querySelector("video")?.play();
+          }}
+        >
+          <Play className="size-12" />
+        </button>
+      )}
       <div className="absolute inset-x-2 bottom-2 flex items-center gap-1">
         <span className="truncate rounded bg-black/60 px-2 py-0.5 text-xs text-white">
           {local ? "You" : trackRef.participant.name || trackRef.participant.identity}
@@ -149,4 +162,24 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
       </div>
     </div>
   );
+}
+
+// iOS (e.g. Low Power Mode) can leave the video paused without livekit-client noticing,
+// so watch the element itself and let a tap start it
+function useVideoPaused(ref: React.RefObject<HTMLDivElement | null>) {
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = (e: Event) => {
+      if (e.target instanceof HTMLVideoElement) setPaused(e.target.paused);
+    };
+    // Media events don't bubble, so listen in the capture phase
+    const events = ["play", "playing", "pause", "loadeddata"];
+    for (const name of events) el.addEventListener(name, update, true);
+    return () => {
+      for (const name of events) el.removeEventListener(name, update, true);
+    };
+  }, [ref]);
+  return paused;
 }
