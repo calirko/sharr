@@ -12,7 +12,13 @@ import { cn } from "@/lib/utils";
 // links the channel to a room. Discord blocks WebRTC here, so sharr-relay (apps/relay) sends the
 // shares' encoded frames over a websocket and we decode the one we watch with WebCodecs.
 
-type Share = { id: number; name: string; codec: string };
+type Share = { id: number; name: string; codec: string; avatar_url: string };
+
+// The page can only load from its own origin, so Discord avatars go through the sharr server
+function avatarUrl(url: string) {
+  const m = url.match(/^https:\/\/cdn\.discordapp\.com\/avatars\/(\d+)\/([0-9a-z_]+)\.png/);
+  return m ? `/api/activity/avatars/${m[1]}/${m[2]}` : undefined;
+}
 
 type State =
   | { kind: "connecting" }
@@ -126,7 +132,7 @@ export function ActivityPage() {
                 variant={s.id === selected?.id ? "secondary" : "ghost"}
                 onClick={() => wsRef.current?.send(`select:${s.id}`)}
               >
-                <UserAvatar name={s.name} className="size-5 text-[0.625rem]" />
+                <UserAvatar name={s.name} url={avatarUrl(s.avatar_url)} className="size-5 text-[0.625rem]" />
                 <span className="max-w-32 truncate">{s.name}</span>
               </Button>
             ))}
@@ -140,7 +146,11 @@ export function ActivityPage() {
           {selected && (
             <div className="absolute inset-x-2 bottom-2 flex items-center opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100">
               <span className="flex h-8 min-w-0 items-center gap-2 rounded-lg bg-black/60 pr-2.5 pl-1.5 text-xs text-white">
-                <UserAvatar name={selected.name} className="size-5 bg-white/20 text-[0.625rem] text-white" />
+                <UserAvatar
+                  name={selected.name}
+                  url={avatarUrl(selected.avatar_url)}
+                  className="size-5 bg-white/20 text-[0.625rem] text-white"
+                />
                 <span className="truncate">{selected.name}</span>
               </span>
             </div>

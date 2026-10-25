@@ -123,12 +123,13 @@ type room struct {
 }
 
 type share struct {
-	id    uint16
-	sid   string
-	codec string // vp8, h264, or the MIME type when we can't forward it
-	name  string
-	ssrc  webrtc.SSRC
-	rp    *lksdk.RemoteParticipant
+	id     uint16
+	sid    string
+	codec  string // vp8, h264, or the MIME type when we can't forward it
+	name   string
+	avatar string // Discord avatar URL from the participant's token attributes, if any
+	ssrc   webrtc.SSRC
+	rp     *lksdk.RemoteParticipant
 }
 
 func (r *room) add(v *viewer) {
@@ -190,7 +191,7 @@ func (r *room) announce() {
 	sort.Ints(ids)
 	for _, id := range ids {
 		t := r.tracks[uint16(id)]
-		list = append(list, map[string]any{"id": t.id, "name": t.name, "codec": t.codec})
+		list = append(list, map[string]any{"id": t.id, "name": t.name, "codec": t.codec, "avatar_url": t.avatar})
 	}
 	var keys []uint16
 	for v := range r.viewers {
@@ -336,7 +337,7 @@ func (r *room) onSubscribed(track *webrtc.TrackRemote, pub *lksdk.RemoteTrackPub
 	if r.nextID == 0 {
 		r.nextID = 1
 	}
-	t := &share{id: r.nextID, sid: pub.SID(), codec: codec, name: rp.Name(), ssrc: track.SSRC(), rp: rp}
+	t := &share{id: r.nextID, sid: pub.SID(), codec: codec, name: rp.Name(), avatar: rp.Attributes()["avatar_url"], ssrc: track.SSRC(), rp: rp}
 	r.tracks[t.id] = t
 	r.mu.Unlock()
 	log.Printf("room %s: share %d, %s from %s", r.id, t.id, codec, rp.Name())

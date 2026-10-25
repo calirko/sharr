@@ -51,6 +51,19 @@ export const internalApp = new Hono().post(
 );
 
 export const activityRoutes = new Hono()
+  // Activities can only load from our own origin (through Discord's proxy), so Discord avatars come through here
+  .get("/avatars/:discord_id/:hash", async (c) => {
+    const { discord_id, hash } = c.req.param();
+    if (!/^\d{1,20}$/.test(discord_id) || !/^(a_)?[0-9a-f]{32}$/.test(hash)) return c.json({ error: "not_found" }, 404);
+    const res = await fetch(`https://cdn.discordapp.com/avatars/${discord_id}/${hash}.png?size=128`, {
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => null);
+    if (!res?.ok) return c.json({ error: "not_found" }, 404);
+    return c.body(await res.arrayBuffer(), 200, {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=86400",
+    });
+  })
   .get("/:channel", async (c) => {
     const room = await linkedRoom(c.req.param("channel"));
     if (!room) return c.json({ error: "not_found" }, 404);
