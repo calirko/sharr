@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -62,7 +64,7 @@ func serveViewer(ctx context.Context, hub *hub, room string, conn *websocket.Con
 	r := hub.join(room, v)
 	defer hub.leave(r, v)
 
-	// The only message viewers send is "key", after a decode error
+	// Viewers send "key" after a decode error and "select:<id>" to switch shares
 	go func() {
 		defer cancel()
 		for {
@@ -70,9 +72,17 @@ func serveViewer(ctx context.Context, hub *hub, room string, conn *websocket.Con
 			if err != nil {
 				return
 			}
-			if string(msg) == "key" {
+			text := string(msg)
+			if text == "key" {
 				v.needKey()
-				r.requestKey()
+				v.mu.Lock()
+				id := v.selected
+				v.mu.Unlock()
+				r.requestKey(id)
+			} else if s, ok := strings.CutPrefix(text, "select:"); ok {
+				if id, err := strconv.ParseUint(s, 10, 16); err == nil {
+					r.selectTrack(v, uint16(id))
+				}
 			}
 		}
 	}()

@@ -1,30 +1,35 @@
 import { DiscordSDK } from "@discord/embedded-app-sdk";
-import { CircleAlert, Link2Off, MonitorPlay } from "lucide-react";
+import { Link2Off, MonitorUp, Unplug } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { CenterStack } from "@/components/Layout";
+import { toast } from "sonner";
+import { CenterStack, TopBar } from "@/components/Layout";
+import { LogoMark } from "@/components/Logo";
+import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/UserAvatar";
+import { cn } from "@/lib/utils";
 
 // Discord Activity test (calico app, URL mapping `/` to this server). `/sharr <link>` in the bot
 // links the channel to a room. Discord blocks WebRTC here, so sharr-relay (apps/relay) sends the
-// share's encoded frames over a websocket and we decode them with WebCodecs.
+// shares' encoded frames over a websocket and we decode the one we watch with WebCodecs.
+
+type Share = { id: number; name: string; codec: string };
 
 type State =
   | { kind: "connecting" }
   | { kind: "no_link" }
-  | { kind: "waiting"; room: string }
-  | { kind: "watching"; room: string; name: string }
-  | { kind: "error"; text: string };
-
-type Control = { type: "none" } | { type: "track"; codec: "vp8" | "h264"; name: string } | { type: "unsupported"; codec: string };
+  | { kind: "offline"; room: string }
+  | { kind: "live"; room: string; shares: Share[]; selected: number };
 
 export function ActivityPage() {
   const [state, setState] = useState<State>({ kind: "connecting" });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     let stopped = false;
-    let ws: WebSocket | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    const player = new Player(canvasRef, () => ws?.readyState === WebSocket.OPEN && ws.send("key"));
+    const send = (text: string) => wsRef.current?.readyState === WebSocket.OPEN && wsRef.current.send(text);
+    const player = new Player(canvasRef, () => send("key"));
 
     async function start() {
       // Activities run on <client_id>.discordsays.com
@@ -34,72 +39,123 @@ export function ActivityPage() {
       if (!channelId) return setState({ kind: "no_link" });
       const res = await fetch(`/api/activity/${channelId}`);
       if (res.status === 404) return setState({ kind: "no_link" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`Could not reach sharr (${res.status})`);
       const { room } = (await res.json()) as { room: { name: string } };
-      setState({ kind: "waiting", room: room.name });
       connect(channelId, room.name);
     }
 
     function connect(channelId: string, room: string) {
       if (stopped) return;
-      ws = new WebSocket(`wss://${location.host}/api/activity/${channelId}/stream`);
+      const ws = new WebSocket(`wss://${location.host}/api/activity/${channelId}/stream`);
+      wsRef.current = ws;
       ws.binaryType = "arraybuffer";
       ws.onmessage = (e) => {
         if (typeof e.data !== "string") return player.frame(e.data as ArrayBuffer);
-        const msg = JSON.parse(e.data) as Control;
-        if (msg.type === "track") {
-          player.setCodec(msg.codec);
-          setState({ kind: "watching", room, name: msg.name });
-        } else if (msg.type === "unsupported") {
-          player.setCodec(null);
-          setState({ kind: "error", text: `The share uses ${msg.codec}, which this test can't play yet.` });
-        } else {
-          player.setCodec(null);
-          setState({ kind: "waiting", room });
-        }
+        const msg = JSON.parse(e.data) as { type: "tracks"; tracks: Share[]; selected: number };
+        if (msg.type !== "tracks") return;
+        const share = msg.tracks.find((s) => s.id === msg.selected);
+        player.watch(share && (share.codec === "vp8" || share.codec === "h264") ? share : null);
+        setState({ kind: "live", room, shares: msg.tracks, selected: msg.selected });
       };
       ws.onclose = () => {
-        player.setCodec(null);
-        if (!stopped) retry = setTimeout(() => connect(channelId, room), 3000);
+        player.watch(null);
+        if (stopped) return;
+        setState({ kind: "offline", room });
+        // The sharr server answers 404 once the room is closed, which ends up here again
+        retry = setTimeout(async () => {
+          const res = await fetch(`/api/activity/${channelId}`).catch(() => null);
+          if (res?.status === 404) setState({ kind: "no_link" });
+          else connect(channelId, room);
+        }, 3000);
       };
     }
 
-    start().catch((err) => setState({ kind: "error", text: err instanceof Error ? err.message : String(err) }));
+    start().catch((err) => {
+      toast.error(err instanceof Error ? err.message : String(err));
+      setState({ kind: "no_link" });
+    });
     return () => {
       stopped = true;
       clearTimeout(retry);
-      ws?.close();
-      player.setCodec(null);
+      wsRef.current?.close();
+      player.watch(null);
     };
   }, []);
 
-  return (
-    <main className="relative flex h-dvh items-center justify-center bg-black p-4 text-white">
-      <canvas
-        ref={canvasRef}
-        className={state.kind === "watching" ? "absolute inset-0 size-full object-contain" : "hidden"}
+  const room = state.kind === "live" || state.kind === "offline" ? state.room : null;
+  const shares = state.kind === "live" ? state.shares : [];
+  const selected = state.kind === "live" ? shares.find((s) => s.id === state.selected) : undefined;
+  const playable = selected && (selected.codec === "vp8" || selected.codec === "h264");
+
+  let content;
+  if (state.kind === "connecting") {
+    content = <CenterStack icon={MonitorUp} text="Connecting..." className="flex-1 justify-center" />;
+  } else if (state.kind === "no_link") {
+    content = (
+      <CenterStack
+        icon={Link2Off}
+        text="No room is linked to this channel. Run /sharr with a room link."
+        className="flex-1 justify-center"
       />
-      {state.kind === "watching" && (
-        <p className="absolute top-2 left-2 rounded bg-black/60 px-2 py-1 text-sm">
-          {state.name} in <span className="font-display">{state.room}</span>
-        </p>
-      )}
-      {state.kind === "connecting" && <CenterStack icon={MonitorPlay} text="Connecting..." />}
-      {state.kind === "no_link" && (
-        <CenterStack icon={Link2Off} text="No room linked to this channel. Run /sharr with a room link first." />
-      )}
-      {state.kind === "waiting" && (
-        <CenterStack icon={MonitorPlay} text={`Nobody is sharing in ${state.room} yet.`} />
-      )}
-      {state.kind === "error" && <CenterStack icon={CircleAlert} text={state.text} />}
-    </main>
+    );
+  } else if (state.kind === "offline") {
+    content = <CenterStack icon={Unplug} text="Lost the connection. Reconnecting..." className="flex-1 justify-center" />;
+  } else if (!selected) {
+    content = <CenterStack icon={MonitorUp} text="Nobody is sharing yet." className="flex-1 justify-center" />;
+  } else if (!playable) {
+    content = (
+      <CenterStack
+        icon={MonitorUp}
+        text={`${selected.name} is sharing in a format this can't play yet (${selected.codec}).`}
+        className="flex-1 justify-center"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-dvh flex-col">
+      <TopBar>
+        <LogoMark />
+        <h1 className="font-display min-w-0 flex-1 truncate text-lg font-semibold">{room ?? "sharr"}</h1>
+        {shares.length > 1 && (
+          <div className="flex min-w-0 gap-1 overflow-x-auto">
+            {shares.map((s) => (
+              <Button
+                key={s.id}
+                size="sm"
+                variant={s.id === selected?.id ? "secondary" : "ghost"}
+                onClick={() => wsRef.current?.send(`select:${s.id}`)}
+              >
+                <UserAvatar name={s.name} className="size-5 text-[0.625rem]" />
+                <span className="max-w-32 truncate">{s.name}</span>
+              </Button>
+            ))}
+          </div>
+        )}
+      </TopBar>
+      <main className="flex min-h-0 flex-1 flex-col p-2">
+        {content}
+        <div className={cn("group relative min-h-0 flex-1 overflow-hidden rounded-md bg-black", content && "hidden")}>
+          <canvas ref={canvasRef} className="size-full object-contain" />
+          {selected && (
+            <div className="absolute inset-x-2 bottom-2 flex items-center opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100">
+              <span className="flex h-8 min-w-0 items-center gap-2 rounded-lg bg-black/60 pr-2.5 pl-1.5 text-xs text-white">
+                <UserAvatar name={selected.name} className="size-5 bg-white/20 text-[0.625rem] text-white" />
+                <span className="truncate">{selected.name}</span>
+              </span>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
 
-// Frames: 1 byte flags (1 = keyframe), 8 bytes timestamp in microseconds (float64), then the frame
+// Frames: 1 byte flags (1 = keyframe), 2 bytes share id, 8 bytes timestamp in microseconds
+// (float64), then the frame
 class Player {
   private decoder: VideoDecoder | null = null;
-  private codec: "vp8" | "h264" | null = null;
+  private share: Share | null = null;
   private waitKey = true;
 
   constructor(
@@ -107,22 +163,25 @@ class Player {
     private requestKey: () => void,
   ) {}
 
-  setCodec(codec: "vp8" | "h264" | null) {
-    this.codec = codec;
+  watch(share: Share | null) {
+    if (share?.id === this.share?.id && share?.codec === this.share?.codec) return;
+    this.share = share;
     this.reset();
   }
 
   frame(buf: ArrayBuffer) {
-    if (!this.codec || buf.byteLength < 10) return;
+    if (!this.share || buf.byteLength < 12) return;
     const view = new DataView(buf);
+    // Frames of the share we just switched away from can still be on the way
+    if (view.getUint16(1) !== this.share.id) return;
     const key = (view.getUint8(0) & 1) === 1;
-    const timestamp = view.getFloat64(1);
-    const data = new Uint8Array(buf, 9);
+    const timestamp = view.getFloat64(3);
+    const data = new Uint8Array(buf, 11);
     if (this.waitKey && !key) return;
 
     if (!this.decoder || this.decoder.state !== "configured") {
       if (!key) return;
-      const codec = this.codec === "vp8" ? "vp8" : h264Codec(data);
+      const codec = this.share.codec === "vp8" ? "vp8" : h264Codec(data);
       if (!codec) return;
       this.decoder = new VideoDecoder({ output: (f) => this.draw(f), error: () => this.broken() });
       this.decoder.configure({ codec, optimizeForLatency: true });

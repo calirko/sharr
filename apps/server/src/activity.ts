@@ -73,8 +73,10 @@ export const activityRoutes = new Hono()
           upstream.onmessage = (e) => ws.send(e.data);
           upstream.onclose = () => ws.close();
         },
+        // Viewers only ask for a keyframe or pick a share
         onMessage: (e) => {
-          if (upstream?.readyState === WebSocket.OPEN && e.data === "key") upstream.send("key");
+          if (upstream?.readyState !== WebSocket.OPEN || typeof e.data !== "string") return;
+          if (e.data === "key" || /^select:\d{1,5}$/.test(e.data)) upstream.send(e.data);
         },
         onClose: () => upstream?.close(),
       };

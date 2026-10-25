@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -28,7 +29,9 @@ type message struct {
 type viewer struct {
 	out chan message
 	mu  sync.Mutex
-	// Set until the viewer gets a keyframe: after a drop or a decode error, deltas are useless
+	// The share this viewer watches (track id, 0 = none). Only its frames are sent.
+	selected uint16
+	// Set until the viewer gets a keyframe: after a switch, a drop or a decode error, deltas are useless
 	waitKey bool
 }
 
@@ -49,10 +52,10 @@ func (v *viewer) sendText(data []byte) {
 }
 
 // Returns false when the viewer is behind and needs a keyframe
-func (v *viewer) sendFrame(data []byte, key bool) bool {
+func (v *viewer) sendFrame(id uint16, data []byte, key bool) bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if v.waitKey && !key {
+	if v.selected != id || (v.waitKey && !key) {
 		return true
 	}
 	select {
@@ -85,7 +88,7 @@ func (h *hub) join(id string, v *viewer) *room {
 		}
 	}
 	if r == nil {
-		r = &room{id: id, cfg: h.cfg, viewers: map[*viewer]bool{}, gone: make(chan struct{})}
+		r = &room{id: id, cfg: h.cfg, viewers: map[*viewer]bool{}, tracks: map[uint16]*share{}, gone: make(chan struct{})}
 		h.rooms[id] = r
 		go r.run()
 	}
@@ -104,7 +107,8 @@ func (h *hub) leave(r *room, v *viewer) {
 	}
 }
 
-// One LiveKit connection per sharr room, shared by all its viewers
+// One LiveKit connection per sharr room, shared by all its viewers. Subscribes to every screen
+// share video; each viewer picks one and only gets that one's frames.
 type room struct {
 	id      string
 	cfg     config
@@ -112,17 +116,16 @@ type room struct {
 	viewers map[*viewer]bool
 	lk      *lksdk.Room
 	closed  bool
-	// The share being forwarded. Only one for now: the first screen share video.
-	track *activeTrack
-	// Subscribed, waiting for the track to arrive
-	pending bool
+	tracks  map[uint16]*share
+	nextID  uint16
 	// Closed when the LiveKit connection ends
 	gone chan struct{}
 }
 
-type activeTrack struct {
+type share struct {
+	id    uint16
 	sid   string
-	codec string
+	codec string // vp8, h264, or the MIME type when we can't forward it
 	name  string
 	ssrc  webrtc.SSRC
 	rp    *lksdk.RemoteParticipant
@@ -131,10 +134,8 @@ type activeTrack struct {
 func (r *room) add(v *viewer) {
 	r.mu.Lock()
 	r.viewers[v] = true
-	t := r.track
 	r.mu.Unlock()
-	v.sendText(trackMessage(t))
-	r.requestKey()
+	r.announce()
 }
 
 func (r *room) remove(v *viewer) int {
@@ -154,41 +155,73 @@ func (r *room) close() {
 	}
 }
 
-func (r *room) requestKey() {
+func (r *room) requestKey(id uint16) {
 	r.mu.Lock()
-	t := r.track
+	t := r.tracks[id]
 	r.mu.Unlock()
 	if t != nil {
 		t.rp.WritePLI(t.ssrc)
 	}
 }
 
-func (r *room) broadcastText(data []byte) {
+func (r *room) selectTrack(v *viewer, id uint16) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	_, ok := r.tracks[id]
+	r.mu.Unlock()
+	if !ok {
+		return
+	}
+	v.mu.Lock()
+	v.selected, v.waitKey = id, true
+	v.mu.Unlock()
+	r.announce()
+	r.requestKey(id)
+}
+
+// Sends every viewer the list of shares and the one it watches. Viewers whose share is gone
+// (or who have none yet) move to the first one.
+func (r *room) announce() {
+	r.mu.Lock()
+	list := make([]map[string]any, 0, len(r.tracks))
+	ids := make([]int, 0, len(r.tracks))
+	for id := range r.tracks {
+		ids = append(ids, int(id))
+	}
+	sort.Ints(ids)
+	for _, id := range ids {
+		t := r.tracks[uint16(id)]
+		list = append(list, map[string]any{"id": t.id, "name": t.name, "codec": t.codec})
+	}
+	var keys []uint16
 	for v := range r.viewers {
-		v.sendText(data)
+		v.mu.Lock()
+		if _, ok := r.tracks[v.selected]; !ok {
+			v.selected, v.waitKey = 0, true
+			if len(ids) > 0 {
+				v.selected = uint16(ids[0])
+				keys = append(keys, v.selected)
+			}
+		}
+		b, _ := json.Marshal(map[string]any{"type": "tracks", "tracks": list, "selected": v.selected})
+		v.mu.Unlock()
+		v.sendText(b)
+	}
+	r.mu.Unlock()
+	for _, id := range keys {
+		r.requestKey(id)
 	}
 }
 
-func (r *room) broadcastFrame(data []byte, key bool) (behind bool) {
+// Frames go only to viewers watching that share. Returns true if one of them fell behind.
+func (r *room) sendFrame(id uint16, data []byte, key bool) (behind bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for v := range r.viewers {
-		if !v.sendFrame(data, key) {
+		if !v.sendFrame(id, data, key) {
 			behind = true
 		}
 	}
 	return behind
-}
-
-func trackMessage(t *activeTrack) []byte {
-	m := map[string]string{"type": "none"}
-	if t != nil {
-		m = map[string]string{"type": "track", "codec": t.codec, "name": t.name}
-	}
-	b, _ := json.Marshal(m)
-	return b
 }
 
 // Connects and stays connected until the last viewer leaves. If LiveKit drops us (the room was
@@ -211,7 +244,7 @@ func (r *room) run() {
 		return
 	}
 	log.Printf("room %s: connected", r.id)
-	go r.pickTrack()
+	go r.subscribeAll()
 	<-done
 	log.Printf("room %s: disconnected", r.id)
 }
@@ -233,24 +266,16 @@ func (r *room) connect(done chan struct{}) (*lksdk.Room, error) {
 		OnDisconnected: func() { once.Do(func() { close(done) }) },
 		ParticipantCallback: lksdk.ParticipantCallback{
 			// SDK callbacks run under its locks, so don't call back into the room from here
-			OnTrackPublished: func(pub *lksdk.RemoteTrackPublication, _ *lksdk.RemoteParticipant) { go r.subscribe(pub) },
-			OnTrackUnpublished: func(pub *lksdk.RemoteTrackPublication, _ *lksdk.RemoteParticipant) {
-				r.mu.Lock()
-				gone := r.track != nil && r.track.sid == pub.SID()
-				r.mu.Unlock()
-				if gone {
-					r.setTrack(nil)
-					go r.pickTrack()
-				}
-			},
-			OnTrackSubscribed: r.onSubscribed,
+			OnTrackPublished:   func(pub *lksdk.RemoteTrackPublication, _ *lksdk.RemoteParticipant) { go r.subscribe(pub) },
+			OnTrackUnpublished: func(pub *lksdk.RemoteTrackPublication, _ *lksdk.RemoteParticipant) { go r.dropTrack(pub.SID()) },
+			OnTrackSubscribed:  r.onSubscribed,
 		},
 	}
 	return lksdk.ConnectToRoomWithToken(r.cfg.url, token, cb, lksdk.WithAutoSubscribe(false))
 }
 
-// Subscribes to the first screen share video if nothing is being forwarded
-func (r *room) pickTrack() {
+// Shares that were already running when we joined
+func (r *room) subscribeAll() {
 	r.mu.Lock()
 	lk := r.lk
 	r.mu.Unlock()
@@ -259,43 +284,37 @@ func (r *room) pickTrack() {
 	}
 	for _, rp := range lk.GetRemoteParticipants() {
 		for _, pub := range rp.TrackPublications() {
-			if rpub, ok := pub.(*lksdk.RemoteTrackPublication); ok && r.subscribe(rpub) {
-				return
+			if rpub, ok := pub.(*lksdk.RemoteTrackPublication); ok {
+				r.subscribe(rpub)
 			}
 		}
 	}
 }
 
-func (r *room) subscribe(pub *lksdk.RemoteTrackPublication) bool {
-	if pub.Source() != livekit.TrackSource_SCREEN_SHARE || pub.Kind() != lksdk.TrackKindVideo {
-		return false
-	}
-	r.mu.Lock()
-	busy := r.track != nil || r.pending
-	if !busy {
-		r.pending = true
-	}
-	r.mu.Unlock()
-	if busy {
-		return false
+func (r *room) subscribe(pub *lksdk.RemoteTrackPublication) {
+	if pub.Source() != livekit.TrackSource_SCREEN_SHARE || pub.Kind() != lksdk.TrackKindVideo || pub.IsSubscribed() {
+		return
 	}
 	if err := pub.SetSubscribed(true); err != nil {
 		log.Printf("room %s: subscribe: %v", r.id, err)
-		r.mu.Lock()
-		r.pending = false
-		r.mu.Unlock()
-		return false
+		return
 	}
 	pub.SetVideoQuality(livekit.VideoQuality_HIGH)
-	return true
 }
 
-func (r *room) setTrack(t *activeTrack) {
+func (r *room) dropTrack(sid string) {
 	r.mu.Lock()
-	r.track = t
-	r.pending = false
+	found := false
+	for id, t := range r.tracks {
+		if t.sid == sid {
+			delete(r.tracks, id)
+			found = true
+		}
+	}
 	r.mu.Unlock()
-	r.broadcastText(trackMessage(t))
+	if found {
+		r.announce()
+	}
 }
 
 func (r *room) onSubscribed(track *webrtc.TrackRemote, pub *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
@@ -303,26 +322,33 @@ func (r *room) onSubscribed(track *webrtc.TrackRemote, pub *lksdk.RemoteTrackPub
 		return
 	}
 	var depacketizer rtp.Depacketizer
-	var codec string
-	switch track.Codec().MimeType {
+	codec := track.Codec().MimeType
+	switch codec {
 	case webrtc.MimeTypeVP8:
 		depacketizer, codec = &codecs.VP8Packet{}, "vp8"
 	case webrtc.MimeTypeH264:
 		depacketizer, codec = &codecs.H264Packet{}, "h264"
 	default:
-		log.Printf("room %s: unsupported codec %s", r.id, track.Codec().MimeType)
-		r.broadcastText([]byte(`{"type":"unsupported","codec":"` + track.Codec().MimeType + `"}`))
-		return
+		log.Printf("room %s: unsupported codec %s", r.id, codec)
 	}
-	t := &activeTrack{sid: pub.SID(), codec: codec, name: rp.Name(), ssrc: track.SSRC(), rp: rp}
-	r.setTrack(t)
-	log.Printf("room %s: forwarding %s from %s", r.id, codec, rp.Name())
-	r.requestKey()
-	go r.forward(track, depacketizer, t)
+	r.mu.Lock()
+	r.nextID++
+	if r.nextID == 0 {
+		r.nextID = 1
+	}
+	t := &share{id: r.nextID, sid: pub.SID(), codec: codec, name: rp.Name(), ssrc: track.SSRC(), rp: rp}
+	r.tracks[t.id] = t
+	r.mu.Unlock()
+	log.Printf("room %s: share %d, %s from %s", r.id, t.id, codec, rp.Name())
+	r.announce()
+	if depacketizer != nil {
+		go r.forward(track, depacketizer, t)
+	}
 }
 
-// Frame message: 1 byte flags (1 = keyframe), 8 bytes timestamp in microseconds (float64), frame data
-func (r *room) forward(track *webrtc.TrackRemote, depacketizer rtp.Depacketizer, t *activeTrack) {
+// Frame message: 1 byte flags (1 = keyframe), 2 bytes share id, 8 bytes timestamp in
+// microseconds (float64), then the frame
+func (r *room) forward(track *webrtc.TrackRemote, depacketizer rtp.Depacketizer, t *share) {
 	sb := samplebuilder.New(512, depacketizer, track.Codec().ClockRate)
 	var first uint32
 	started := false
@@ -333,7 +359,7 @@ func (r *room) forward(track *webrtc.TrackRemote, depacketizer rtp.Depacketizer,
 			return
 		}
 		r.mu.Lock()
-		current := r.track == t
+		current := r.tracks[t.id] == t
 		r.mu.Unlock()
 		if !current {
 			return
@@ -345,17 +371,18 @@ func (r *room) forward(track *webrtc.TrackRemote, depacketizer rtp.Depacketizer,
 			}
 			key := isKeyframe(t.codec, s.Data)
 			us := float64(s.PacketTimestamp-first) / float64(track.Codec().ClockRate) * 1e6
-			msg := make([]byte, 9+len(s.Data))
+			msg := make([]byte, 11+len(s.Data))
 			if key {
 				msg[0] = 1
 			}
-			binary.BigEndian.PutUint64(msg[1:9], math.Float64bits(us))
-			copy(msg[9:], s.Data)
+			binary.BigEndian.PutUint16(msg[1:3], t.id)
+			binary.BigEndian.PutUint64(msg[3:11], math.Float64bits(us))
+			copy(msg[11:], s.Data)
 			// A gap in the samples (lost packets) breaks the decode chain until the next keyframe
-			if r.broadcastFrame(msg, key) || s.PrevDroppedPackets > 0 {
+			if r.sendFrame(t.id, msg, key) || s.PrevDroppedPackets > 0 {
 				if time.Since(lastPLI) > time.Second {
 					lastPLI = time.Now()
-					r.requestKey()
+					r.requestKey(t.id)
 				}
 			}
 		}
