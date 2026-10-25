@@ -100,6 +100,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          # Artifacts keep their bundle folders
+          find dist -mindepth 2 -type f -exec mv {} dist/ \;
           version=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
           [ "desktop-v$version" = "$TAG" ] || { echo "tag $TAG does not match version $version"; exit 1; }
           appimage=$(cd dist && ls *.AppImage)
