@@ -15,6 +15,9 @@ if (production && process.env.LIVEKIT_API_KEY === "devkey") {
 
 export const config = {
   port: Number(process.env.PORT ?? 3000),
+  // For the calico bot (Discord Activity test). Not routed through the tunnel.
+  internalPort: Number(process.env.INTERNAL_PORT ?? 3001),
+  relayUrl: process.env.RELAY_URL ?? "ws://localhost:7890",
   production,
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
   sessionSecret,

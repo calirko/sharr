@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { bodyLimit } from "hono/body-limit";
-import { upgradeWebSocket, websocket } from "hono/bun";
+import { websocket } from "hono/bun";
 import { secureHeaders } from "hono/secure-headers";
+import { activityRoutes, internalApp } from "./activity";
 import { config } from "./config";
 import { limitByIp, sameOrigin } from "./guard";
 import { startRoomSweeper } from "./expiry";
@@ -25,20 +26,11 @@ api.get("/health", async (c) => {
 // Loose cap on everything, well above what the web app polls
 api.use(limitByIp("api", 600, 60));
 api.use(sessionMiddleware);
-// Discord Activity test (apps/web/src/pages/Activity.tsx): checks that Discord's proxy passes websockets
-api.get(
-  "/activity-probe",
-  upgradeWebSocket(() => ({
-    onOpen: (_, ws) => {
-      ws.send("ok");
-      ws.close();
-    },
-  })),
-);
 api.route("/auth", authRoutes);
 api.route("/session", sessionRoutes);
 api.route("/rooms", roomRoutes);
 api.route("/admin", adminRoutes);
+api.route("/activity", activityRoutes);
 api.all("*", (c) => c.json({ error: "not_found" }, 404));
 
 const app = new Hono();
@@ -76,5 +68,8 @@ app.onError((err, c) => {
 
 startRoomSweeper();
 console.log(`sharr server on :${config.port}`);
+
+Bun.serve({ port: config.internalPort, fetch: internalApp.fetch });
+console.log(`internal API on :${config.internalPort}`);
 
 export default { port: config.port, fetch: app.fetch, websocket };
