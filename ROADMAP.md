@@ -36,7 +36,7 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [ ] Verify on Windows Chrome/Firefox and Linux Wayland (portal + PipeWire), incl. tab/system audio
   - Firefox on Hyprland: picture goes green or the share stops after switching workspaces, portal bug (see `docs/known-issues/hyprland-portal-green-frames.md`)
   - Firefox publishes no audio track with the share (seen in LiveKit logs); Chrome does. Retest Chrome tab vs whole-screen audio on Linux
-  - Zen (Firefox 157, Linux) never gets a media connection on prod: every join ends after 15s with `SIGNAL_SOURCE_CLOSE` and never goes active, also on a phone hotspot. Chrome on the same machine connects at once. Suspect: the WireGuard interface or IPv6. Next step: retest with the VPN down, check `about:webrtc`
+  - Zen (Firefox 157, Linux) never got a media connection on prod while a WireGuard interface was up (joins ended after 15s with `SIGNAL_SOURCE_CLOSE`); Chrome was fine. Works with the VPN down. Local setup, not a sharr bug; workaround is `media.peerconnection.ice.force_interface`
   - iOS Safari in Low Power Mode leaves video paused without telling livekit-client; tiles now show a play button (fixed)
 
 ## M4 — Discord login + history
