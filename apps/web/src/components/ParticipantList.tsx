@@ -1,6 +1,8 @@
 import { useParticipants } from "@livekit/components-react";
 import type { Participant } from "livekit-client";
 import { Crown, MonitorUp, UserX } from "lucide-react";
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { ParticipantAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
@@ -9,11 +11,7 @@ import { api } from "@/lib/api";
 // canKick: the local user created the room
 export function ParticipantList({ roomId, creatorId, canKick }: { roomId: string; creatorId: string; canKick: boolean }) {
   const participants = useParticipants();
-
-  function kick(p: Participant) {
-    if (!confirm(`Remove ${p.name || p.identity} from the room?`)) return;
-    api.kick(roomId, p.identity).catch((err) => console.error("kick failed", err));
-  }
+  const [kicking, setKicking] = useState<Participant | null>(null);
   // Owner first, then everyone in join order
   const sorted = [...participants].sort((a, b) => Number(b.identity === creatorId) - Number(a.identity === creatorId));
 
@@ -49,13 +47,23 @@ export function ParticipantList({ roomId, creatorId, canKick }: { roomId: string
               </span>
             )}
             {canKick && !p.isLocal && (
-              <Button variant="ghost" size="icon-xs" title="Remove from room" onClick={() => kick(p)}>
+              <Button variant="ghost" size="icon-xs" title="Remove from room" onClick={() => setKicking(p)}>
                 <UserX />
               </Button>
             )}
           </li>
         ))}
       </ul>
+      {kicking && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && setKicking(null)}
+          title="Remove from room"
+          description={`${kicking.name || kicking.identity} will be disconnected. They can't rejoin until the room closes.`}
+          confirmLabel="Remove"
+          onConfirm={() => api.kick(roomId, kicking.identity)}
+        />
+      )}
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import { ArrowLeft, Lock, MonitorUp, Shield, Trash2, Users, UserX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { Logo } from "@/components/Logo";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -9,8 +10,13 @@ import { Button } from "@/components/ui/button";
 import { api, type AdminParticipant, type AdminRoom, type AdminUser } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { useUser } from "@/lib/user";
+import { toast } from "sonner";
 
 const POLL_MS = 5_000;
+
+type Pending =
+  | { kind: "close"; room: AdminRoom }
+  | { kind: "kick"; room: AdminRoom; participant: AdminParticipant };
 
 function ago(ms: number) {
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
@@ -24,12 +30,12 @@ export function AdminPage() {
   const { user } = useUser();
   const [rooms, setRooms] = useState<AdminRoom[] | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
-  const [error, setError] = useState("");
+  const [pending, setPending] = useState<Pending | null>(null);
 
   const load = useCallback(() => {
     api.admin.rooms().then(
       (r) => setRooms(r.rooms),
-      (err) => setError(errorText(err)),
+      (err) => toast.error(errorText(err)),
     );
   }, []);
 
@@ -38,21 +44,11 @@ export function AdminPage() {
     load();
     api.admin.users().then(
       (r) => setUsers(r.users),
-      (err) => setError(errorText(err)),
+      (err) => toast.error(errorText(err)),
     );
     const timer = setInterval(load, POLL_MS);
     return () => clearInterval(timer);
   }, [user?.is_admin, load]);
-
-  async function run(action: Promise<unknown>) {
-    try {
-      await action;
-      setError("");
-    } catch (err) {
-      setError(errorText(err));
-    }
-    load();
-  }
 
   if (!user?.is_admin) {
     return (
@@ -81,8 +77,6 @@ export function AdminPage() {
         </Button>
       </header>
 
-      {error && <p className="text-destructive text-sm">{error}</p>}
-
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-sm font-bold">Rooms {rooms && `(${rooms.length})`}</h2>
         {rooms?.length === 0 && <p className="text-muted-foreground py-6 text-center text-sm">No rooms.</p>}
@@ -91,13 +85,8 @@ export function AdminPage() {
             <RoomItem
               key={room.id}
               room={room}
-              onClose={() => {
-                const label = room.known ? room.name : room.id;
-                if (confirm(`Close "${label}"? Everyone in it is disconnected.`)) run(api.admin.closeRoom(room.id));
-              }}
-              onKick={(p) => {
-                if (confirm(`Remove ${p.name} from the room?`)) run(api.admin.kick(room.id, p.identity));
-              }}
+              onClose={() => setPending({ kind: "close", room })}
+              onKick={(participant) => setPending({ kind: "kick", room, participant })}
             />
           ))}
         </ul>
@@ -126,6 +115,26 @@ export function AdminPage() {
           ))}
         </ul>
       </section>
+
+      {pending && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && setPending(null)}
+          {...(pending.kind === "close"
+            ? {
+                title: "Close room",
+                description: `${pending.room.known ? pending.room.name : pending.room.id} will close and everyone in it is disconnected.`,
+                confirmLabel: "Close room",
+                onConfirm: () => api.admin.closeRoom(pending.room.id).then(load),
+              }
+            : {
+                title: "Remove from room",
+                description: `${pending.participant.name || pending.participant.identity} will be disconnected. They can't rejoin until the room closes.`,
+                confirmLabel: "Remove",
+                onConfirm: () => api.admin.kick(pending.room.id, pending.participant.identity).then(load),
+              })}
+        />
+      )}
     </main>
   );
 }

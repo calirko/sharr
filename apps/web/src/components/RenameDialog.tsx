@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { useUser } from "@/lib/user";
+import { toast } from "sonner";
 
 export function RenameDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { user, setUser } = useUser();
   const [nickname, setNickname] = useState(user?.nickname ?? "");
-  const [error, setError] = useState("");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -17,7 +17,7 @@ export function RenameDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       setUser((await api.rename(nickname.trim())).user);
       onOpenChange(false);
     } catch (err) {
-      setError(errorText(err));
+      toast.error(errorText(err));
     }
   }
 
@@ -29,7 +29,6 @@ export function RenameDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             <DialogTitle>Change nickname</DialogTitle>
           </DialogHeader>
           <Input autoFocus maxLength={32} value={nickname} onChange={(e) => setNickname(e.target.value)} />
-          {error && <p className="text-destructive text-sm">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={!nickname.trim()}>
               Save

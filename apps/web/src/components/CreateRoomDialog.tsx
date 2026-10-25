@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { ShareModeSelect } from "@/components/ShareModeSelect";
 import { api, type ShareMode } from "@/lib/api";
 import { errorText } from "@/lib/errors";
+import { toast } from "sonner";
 
 export function CreateRoomDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [, navigate] = useLocation();
@@ -14,19 +15,17 @@ export function CreateRoomDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [pin, setPin] = useState("");
   const [shareMode, setShareMode] = useState<ShareMode>("creator");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
   const pinValid = pin === "" || /^\d{4,12}$/.test(pin);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setError("");
     try {
       const { room } = await api.createRoom({ name: name.trim(), pin: pin || undefined, share_mode: shareMode });
       navigate(`/r/${room.id}`);
     } catch (err) {
-      setError(errorText(err));
+      toast.error(errorText(err));
       setBusy(false);
     }
   }
@@ -58,7 +57,6 @@ export function CreateRoomDialog({ open, onOpenChange }: { open: boolean; onOpen
             <Label>Who can share</Label>
             <ShareModeSelect value={shareMode} onChange={setShareMode} />
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={busy || !name.trim() || !pinValid}>
               Create

@@ -18,6 +18,7 @@ import {
   type QualityId,
 } from "@/lib/quality";
 import { startShare, stopShare, updateShare } from "@/lib/share";
+import { toast } from "sonner";
 
 // `large` is the call to action in the empty room, with the label always shown
 export function ShareButton({ large }: { large?: boolean }) {
@@ -26,14 +27,12 @@ export function ShareButton({ large }: { large?: boolean }) {
   const [quality, setQuality] = useState<QualityId>(loadQuality);
   const [fps, setFps] = useState<Fps>(loadFps);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
   // Phones can watch but not share
   if (!canCaptureScreen()) return null;
 
   async function submit() {
     setBusy(true);
-    setError("");
     saveQuality(quality);
     saveFps(fps);
     try {
@@ -42,7 +41,7 @@ export function ShareButton({ large }: { large?: boolean }) {
       setOpen(false);
     } catch (err) {
       // Closing the browser picker is not an error worth showing
-      if (!(err instanceof Error && err.name === "NotAllowedError")) setError(errorText(err));
+      if (!(err instanceof Error && err.name === "NotAllowedError")) toast.error(errorText(err));
     } finally {
       setBusy(false);
     }
@@ -104,7 +103,6 @@ export function ShareButton({ large }: { large?: boolean }) {
               </SelectContent>
             </Select>
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
           <DialogFooter>
             <Button onClick={submit} disabled={busy}>
               {isScreenShareEnabled ? "Apply" : "Start sharing"}

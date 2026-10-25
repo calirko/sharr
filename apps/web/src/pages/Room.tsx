@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiError, type JoinInfo, type Room } from "@/lib/api";
 import { errorText } from "@/lib/errors";
+import { toast } from "sonner";
 
 type State =
   | { kind: "loading" }
-  | { kind: "pin"; room: Room; error?: string }
+  | { kind: "pin"; room: Room }
   | { kind: "joined"; room: Room; info: JoinInfo }
   | { kind: "ended"; text: string; rejoin: boolean };
 
@@ -47,7 +48,8 @@ export function RoomPage({ id }: { id: string }) {
         setState({ kind: "joined", room, info });
       } catch (err) {
         if (err instanceof ApiError && err.code === "bad_pin") {
-          setState({ kind: "pin", room, error: pin ? "Wrong PIN." : undefined });
+          if (pin) toast.error("Wrong PIN.");
+          setState({ kind: "pin", room });
         } else {
           setState({ kind: "ended", text: errorText(err), rejoin: false });
         }
@@ -74,7 +76,8 @@ export function RoomPage({ id }: { id: string }) {
     (reason?: DisconnectReason) => {
       if (reason === DisconnectReason.CLIENT_INITIATED) return navigate("/");
       const text = (reason !== undefined && endedText[reason]) || "Disconnected.";
-      setState({ kind: "ended", text, rejoin: reason !== DisconnectReason.ROOM_DELETED });
+      const final = reason === DisconnectReason.ROOM_DELETED || reason === DisconnectReason.PARTICIPANT_REMOVED;
+      setState({ kind: "ended", text, rejoin: !final });
     },
     [navigate],
   );
@@ -87,7 +90,7 @@ export function RoomPage({ id }: { id: string }) {
   }, []);
 
   if (state.kind === "loading") return null;
-  if (state.kind === "pin") return <PinForm room={state.room} error={state.error} onSubmit={(pin) => join(state.room, pin)} />;
+  if (state.kind === "pin") return <PinForm room={state.room} onSubmit={(pin) => join(state.room, pin)} />;
   if (state.kind === "ended") {
     return (
       <Centered>
@@ -121,7 +124,7 @@ export function RoomPage({ id }: { id: string }) {
   );
 }
 
-function PinForm({ room, error, onSubmit }: { room: Room; error?: string; onSubmit: (pin: string) => void }) {
+function PinForm({ room, onSubmit }: { room: Room; onSubmit: (pin: string) => void }) {
   const [pin, setPin] = useState("");
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -139,7 +142,6 @@ function PinForm({ room, error, onSubmit }: { room: Room; error?: string; onSubm
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
         />
-        {error && <p className="text-destructive text-sm">{error}</p>}
         <div className="flex gap-2">
           <Button type="submit" className="flex-1" disabled={!pin}>
             Join

@@ -6,11 +6,13 @@ import { config } from "../config";
 import { cleanName, clientIp, count, hit, limitByIp, ROOM_ID } from "../guard";
 import { listParticipantsSafe, mintToken, permissionFor, roomService } from "../livekit";
 import {
+  banFromRoom,
   canShare,
   checkPin,
   claimName,
   createRoom,
   getRoom,
+  isBanned,
   listRooms,
   publicRoom,
   removeRoom,
@@ -99,13 +101,17 @@ export const roomRoutes = new Hono<SessionEnv>()
     await removeRoom(room.id);
     return c.json({ ok: true });
   })
-  // Creator only. They can come back with the link, like after an admin kick.
+  // Creator only. The person can't join again until the room closes.
   .delete("/:id/participants/:identity", async (c) => {
     const room = await getRoom(c.req.param("id"));
     if (!room) return c.json({ error: "not_found" }, 404);
-    if (room.creator_id !== c.get("session")!.user_id) return c.json({ error: "forbidden" }, 403);
+    const identity = c.req.param("identity");
+    if (room.creator_id !== c.get("session")!.user_id || identity === room.creator_id) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+    await banFromRoom(room.id, identity);
     try {
-      await roomService.removeParticipant(room.id, c.req.param("identity"));
+      await roomService.removeParticipant(room.id, identity);
     } catch {
       return c.json({ error: "not_found" }, 404);
     }
@@ -116,6 +122,7 @@ export const roomRoutes = new Hono<SessionEnv>()
     const room = await getRoom(c.req.param("id"));
     if (!room) return c.json({ error: "not_found" }, 404);
     const isCreator = room.creator_id === session.user_id;
+    if (!isCreator && (await isBanned(room.id, session.user_id))) return c.json({ error: "kicked" }, 403);
     if (!isCreator && room.pin_hash) {
       const ipBucket = `pin:${room.id}:${clientIp(c)}`;
       const roomBucket = `pin:${room.id}`;

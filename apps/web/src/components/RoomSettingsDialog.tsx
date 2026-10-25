@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { api, type Room, type ShareMode } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { getSoundPrefs, setSoundPrefs, type SoundPrefs } from "@/lib/sounds";
+import { toast } from "sonner";
 
 type Props = {
   open: boolean;
@@ -20,7 +21,6 @@ type Props = {
 export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoomChange }: Props) {
   const [sounds, setSounds] = useState<SoundPrefs>(getSoundPrefs);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [error, setError] = useState("");
 
   function setSound(key: keyof SoundPrefs, on: boolean) {
     const next = { ...sounds, [key]: on };
@@ -29,21 +29,19 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
   }
 
   async function setShareMode(share_mode: ShareMode) {
-    setError("");
     try {
       onRoomChange((await api.updateRoom(room.id, { share_mode })).room);
     } catch (err) {
-      setError(errorText(err));
+      toast.error(errorText(err));
     }
   }
 
   // The server deletes the LiveKit room, which disconnects everyone including us
   async function close() {
-    setError("");
     try {
       await api.closeRoom(room.id);
     } catch (err) {
-      setError(errorText(err));
+      toast.error(errorText(err));
     }
   }
 
@@ -83,7 +81,6 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
               <Label>Who can share</Label>
               <ShareModeSelect value={room.share_mode} onChange={setShareMode} />
             </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
             <div className="flex justify-end">
               {confirmClose ? (
                 <Button variant="destructive" onClick={close}>

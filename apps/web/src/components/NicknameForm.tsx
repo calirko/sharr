@@ -1,5 +1,5 @@
 import { Logo } from "@/components/Logo";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,23 +7,26 @@ import { DiscordIcon } from "@/components/DiscordIcon";
 import { api, discordLoginUrl } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { useUser } from "@/lib/user";
+import { toast } from "sonner";
 
 export function NicknameForm() {
   const { setUser, discordEnabled } = useUser();
   const [nickname, setNickname] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(() =>
-    new URLSearchParams(location.search).get("login") === "failed" ? "Discord login failed. Try again." : "",
-  );
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("login") === "failed") {
+      toast.error("Discord login failed. Try again.", { id: "login_failed" });
+    }
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setError("");
     try {
       setUser((await api.guest(nickname.trim())).user);
     } catch (err) {
-      setError(errorText(err));
+      toast.error(errorText(err));
       setBusy(false);
     }
   }
@@ -42,7 +45,6 @@ export function NicknameForm() {
             onChange={(e) => setNickname(e.target.value)}
           />
         </div>
-        {error && <p className="text-destructive text-sm">{error}</p>}
         <Button type="submit" disabled={busy || !nickname.trim()}>
           Continue as guest
         </Button>

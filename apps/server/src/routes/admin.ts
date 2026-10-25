@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { TrackSource, type ParticipantInfo } from "livekit-server-sdk";
 import { listParticipantsSafe, roomService } from "../livekit";
-import { listRooms, publicRoom, removeRoom } from "../rooms";
+import { banFromRoom, getRoom, listRooms, publicRoom, removeRoom } from "../rooms";
 import { requireAdmin, type SessionEnv } from "../session";
 import { avatarUrl, getUser, isAdmin, listUsers } from "../users";
 
@@ -56,8 +56,13 @@ export const adminRoutes = new Hono<SessionEnv>()
     return c.json({ ok: true });
   })
   .delete("/rooms/:id/participants/:identity", async (c) => {
+    const id = c.req.param("id");
+    const identity = c.req.param("identity");
+    // Rooms LiveKit has but we don't get no ban list. The creator can't be shut out of their own room.
+    const room = await getRoom(id);
+    if (room && room.creator_id !== identity) await banFromRoom(id, identity);
     try {
-      await roomService.removeParticipant(c.req.param("id"), c.req.param("identity"));
+      await roomService.removeParticipant(id, identity);
     } catch {
       return c.json({ error: "not_found" }, 404);
     }

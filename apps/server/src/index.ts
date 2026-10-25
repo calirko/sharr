@@ -3,7 +3,7 @@ import { serveStatic } from "hono/bun";
 import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import { config } from "./config";
-import { sameOrigin } from "./guard";
+import { limitByIp, sameOrigin } from "./guard";
 import { startRoomSweeper } from "./expiry";
 import { redis } from "./redis";
 import { adminRoutes } from "./routes/admin";
@@ -21,6 +21,8 @@ api.get("/health", async (c) => {
   return c.json({ ok: true });
 });
 
+// Loose cap on everything, well above what the web app polls
+api.use(limitByIp("api", 600, 60));
 api.use(sessionMiddleware);
 api.route("/auth", authRoutes);
 api.route("/session", sessionRoutes);

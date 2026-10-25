@@ -48,7 +48,7 @@ export async function updateRoom(id: string, fields: Partial<Omit<Room, "id">>) 
 }
 
 export async function removeRoom(id: string) {
-  await redis.del(key(id), namesKey(id));
+  await redis.del(key(id), namesKey(id), kickedKey(id));
   await redis.zrem(INDEX, id);
 }
 
@@ -60,6 +60,17 @@ export async function checkPin(room: Room, pin: string | undefined) {
 
 export function canShare(room: Room, userId: string) {
   return room.share_mode === "everyone" || room.creator_id === userId;
+}
+
+// People removed by the creator or an admin stay out until the room closes
+const kickedKey = (id: string) => `room:${id}:kicked`;
+
+export async function banFromRoom(id: string, userId: string) {
+  await redis.sadd(kickedKey(id), userId);
+}
+
+export async function isBanned(id: string, userId: string) {
+  return Boolean(await redis.sismember(kickedKey(id), userId));
 }
 
 // name, name2, name3 ... skipping names already taken in the room.

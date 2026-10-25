@@ -3,13 +3,13 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Keyb
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { MAX_LENGTH, RateLimitedError, useRoomChat } from "@/lib/chat";
+import { toast } from "sonner";
 
 const GROUP_MS = 5 * 60_000;
 
 export function ChatPanel() {
   const { messages, send, nameOf, avatarOf } = useRoomChat();
   const [text, setText] = useState("");
-  const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,10 +39,9 @@ export function ChatPanel() {
     const message = text.trim();
     if (!message) return;
     setText("");
-    setError("");
     await send(message).catch((err) => {
       setText(message);
-      setError(err instanceof RateLimitedError ? "Slow down, you're sending too fast." : "Message not sent.");
+      toast.error(err instanceof RateLimitedError ? "Slow down, you're sending too fast." : "Message not sent.");
     });
   }
 
@@ -83,7 +82,6 @@ export function ChatPanel() {
           );
         })}
       </div>
-      {error && <p className="text-destructive px-3 pb-1 text-sm">{error}</p>}
       <form onSubmit={submit} className="p-2 pt-0">
         <div className="bg-foreground/5 focus-within:ring-ring/50 flex items-end gap-1 rounded-lg p-1 focus-within:ring-2">
           <textarea

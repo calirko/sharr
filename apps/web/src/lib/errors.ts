@@ -3,8 +3,10 @@ import { ApiError } from "./api";
 const messages: Record<string, string> = {
   not_found: "Room not found. It may have closed.",
   bad_pin: "Wrong PIN.",
+  kicked: "You were removed from this room.",
   forbidden: "Only the room creator can do that.",
   rate_limited: "Too many requests. Try again in a bit.",
+  busy: "The server is busy. Try again later.",
   too_many_attempts: "Too many wrong PINs. Try again later.",
   too_many_rooms: "You have too many rooms. Close one first.",
   not_logged_in: "Your session expired. Reload the page.",

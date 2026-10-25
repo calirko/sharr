@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { config, discordEnabled } from "../config";
 import { authorizeUrl, fetchProfile } from "../discord";
+import { limitByIp } from "../guard";
 import { randomId } from "../redis";
 import { createDiscordSession, dropSession, type SessionEnv } from "../session";
 import { upsertDiscordUser } from "../users";
@@ -22,7 +23,7 @@ function safeNext(next: string | undefined) {
 }
 
 export const authRoutes = new Hono<SessionEnv>()
-  .get("/discord", async (c) => {
+  .get("/discord", limitByIp("oauth", 20, 600), async (c) => {
     if (!discordEnabled) return c.json({ error: "not_found" }, 404);
     const state = randomId(16);
     await setSignedCookie(c, COOKIE, `${state}|${safeNext(c.req.query("next"))}`, config.sessionSecret, {
@@ -34,7 +35,8 @@ export const authRoutes = new Hono<SessionEnv>()
     });
     return c.redirect(authorizeUrl(state));
   })
-  .get("/discord/callback", async (c) => {
+  // Every callback costs a request to Discord, so it is limited per IP as well
+  .get("/discord/callback", limitByIp("oauth_callback", 20, 600), async (c) => {
     if (!discordEnabled) return c.json({ error: "not_found" }, 404);
     const saved = await getSignedCookie(c, config.sessionSecret, COOKIE);
     deleteCookie(c, COOKIE, { path: "/api/auth" });
@@ -52,7 +54,7 @@ export const authRoutes = new Hono<SessionEnv>()
       return c.redirect(next);
     }
     const code = c.req.query("code");
-    if (!code || c.req.query("state") !== state) {
+    if (!code || code.length > 256 || c.req.query("state") !== state) {
       console.error(`discord login: ${code ? "state mismatch" : "no code"}`);
       return c.redirect("/?login=failed");
     }
