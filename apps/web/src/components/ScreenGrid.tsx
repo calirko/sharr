@@ -1,18 +1,34 @@
 import { AudioTrack, useTracks, VideoTrack, type TrackReference } from "@livekit/components-react";
-import { Track } from "livekit-client";
-import { Maximize, MonitorUp, Play, Volume1, Volume2, VolumeX } from "lucide-react";
+import { RemoteTrackPublication, Track, VideoQuality } from "livekit-client";
+import { Maximize, MonitorUp, Play, Settings, Volume1, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 
 type Volume = { level: number; muted: boolean };
 const DEFAULT_VOLUME: Volume = { level: 1, muted: false };
 
+// A cap on the simulcast layer we receive. Auto leaves it to the tile size and the SFU.
+const viewQualities = [
+  { id: "auto", label: "Auto", layer: VideoQuality.HIGH },
+  { id: "low", label: "Low", layer: VideoQuality.LOW },
+] as const;
+type ViewQuality = (typeof viewQualities)[number]["id"];
+
 export function ScreenGrid({ tracks }: { tracks: TrackReference[] }) {
   const [focusSid, setFocusSid] = useState<string | null>(null);
   // Per sharer, kept here so it survives tiles remounting when the layout changes
   const [volumes, setVolumes] = useState<Record<string, Volume>>({});
+  const [qualities, setQualities] = useState<Record<string, ViewQuality>>({});
   const audio = useTracks([Track.Source.ScreenShareAudio]).filter((t) => !t.participant.isLocal);
 
   const volumeOf = (identity: string) => volumes[identity] ?? DEFAULT_VOLUME;
@@ -29,6 +45,8 @@ export function ScreenGrid({ tracks }: { tracks: TrackReference[] }) {
         onClick={onClick}
         volume={hasAudio ? volumeOf(identity) : undefined}
         onVolume={(v) => setVolume(identity, v)}
+        quality={qualities[identity] ?? "auto"}
+        onQuality={(q) => setQualities((all) => ({ ...all, [identity]: q }))}
       />
     );
   };
@@ -80,22 +98,35 @@ type TileProps = {
   onClick?: () => void;
   volume?: Volume;
   onVolume: (v: Volume) => void;
+  quality: ViewQuality;
+  onQuality: (q: ViewQuality) => void;
 };
 
-function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
+function Tile({ trackRef, className, onClick, volume, onVolume, quality, onQuality }: TileProps) {
   const ref = useRef<HTMLDivElement>(null);
   const local = trackRef.participant.isLocal;
   const paused = useVideoPaused(ref);
-  // Touch screens have no hover: a tap shows the controls, and they hide again after a while
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Touch screens have no hover: a tap toggles the controls, and they hide again after a while
   const [touchedAt, setTouchedAt] = useState(0);
   useEffect(() => {
-    if (!touchedAt) return;
+    if (!touchedAt || menuOpen) return;
     const t = setTimeout(() => setTouchedAt(0), 3000);
     return () => clearTimeout(t);
-  }, [touchedAt]);
+  }, [touchedAt, menuOpen]);
+
+  const pub = trackRef.publication;
+  const subscribed = !!pub.track;
+  useEffect(() => {
+    if (!subscribed || !(pub instanceof RemoteTrackPublication)) return;
+    pub.setVideoQuality(viewQualities.find((q) => q.id === quality)!.layer);
+  }, [pub, subscribed, quality]);
 
   function click() {
-    if (matchMedia("(pointer: coarse)").matches && !touchedAt) return setTouchedAt(Date.now());
+    if (matchMedia("(pointer: coarse)").matches) {
+      if (!touchedAt) return setTouchedAt(Date.now());
+      setTouchedAt(0);
+    }
     onClick?.();
   }
 
@@ -135,7 +166,7 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
       <div
         className={cn(
           "absolute inset-x-2 bottom-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-has-[:focus-visible]:opacity-100",
-          touchedAt ? "opacity-100" : "pointer-coarse:pointer-events-none",
+          touchedAt || menuOpen ? "opacity-100" : "pointer-coarse:pointer-events-none",
         )}
       >
         <span className="flex h-8 min-w-0 items-center rounded-lg bg-black/60 px-2.5 text-xs text-white">
@@ -168,6 +199,37 @@ function Tile({ trackRef, className, onClick, volume, onVolume }: TileProps) {
               />
             </div>
           </div>
+        )}
+        {!local && (
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Settings"
+                className="rounded-lg bg-black/60 text-white hover:bg-white/20 hover:text-white"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Settings />
+              </Button>
+            </DropdownMenuTrigger>
+            {/* Rendered inside the tile so it still shows in fullscreen */}
+            <DropdownMenuContent
+              container={ref.current}
+              align="end"
+              side="top"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DropdownMenuLabel>Quality</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={quality} onValueChange={(v) => onQuality(v as ViewQuality)}>
+                {viewQualities.map((q) => (
+                  <DropdownMenuRadioItem key={q.id} value={q.id}>
+                    {q.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         <Button
           variant="ghost"
