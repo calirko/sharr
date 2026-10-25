@@ -28,6 +28,7 @@ export function RoomView({ room, info, onRoomChange }: Props) {
   const screens = useTracks([Track.Source.ScreenShare]);
   const permissions = useLocalParticipantPermissions();
   const { canPlayAudio, startAudio } = useAudioPlayback();
+  const canPlayVideo = useVideoPlayback();
   const [chatOpen, setChatOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -104,9 +105,16 @@ export function RoomView({ room, info, onRoomChange }: Props) {
         </Button>
       </header>
 
-      {!canPlayAudio && (
-        <button className="bg-primary/12 text-primary py-2 text-sm font-medium" onClick={startAudio}>
-          Click to enable audio
+      {(!canPlayAudio || !canPlayVideo) && (
+        // Both must start from a user gesture. iOS can block even muted video (e.g. Low Power Mode).
+        <button
+          className="bg-primary/12 text-primary py-2 text-sm font-medium"
+          onClick={() => {
+            startAudio();
+            lkRoom.startVideo();
+          }}
+        >
+          {canPlayVideo ? "Click to enable audio" : "Tap to start playback"}
         </button>
       )}
 
@@ -135,4 +143,18 @@ export function RoomView({ room, info, onRoomChange }: Props) {
       />
     </div>
   );
+}
+
+// components-react has useAudioPlayback but nothing for video
+function useVideoPlayback() {
+  const room = useRoomContext();
+  const [canPlay, setCanPlay] = useState(room.canPlaybackVideo);
+  useEffect(() => {
+    const update = () => setCanPlay(room.canPlaybackVideo);
+    room.on(RoomEvent.VideoPlaybackStatusChanged, update);
+    return () => {
+      room.off(RoomEvent.VideoPlaybackStatusChanged, update);
+    };
+  }, [room]);
+  return canPlay;
 }
