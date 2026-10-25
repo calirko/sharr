@@ -62,8 +62,9 @@ fn cef() -> tauri_runtime_cef::Cef {
         .persist_session_cookies(true)
         // The window only shows our own pages, and room audio should play without a click first
         .autoplay(tauri_runtime_cef::AutoplayPolicy::NoUserGestureRequired);
-    // Debug builds never touch the system keyring, so test runs don't stop at an unlock prompt
-    #[cfg(debug_assertions)]
+    // With a locked keyring Chromium shows nothing but an unlock prompt until it gets the key.
+    // Skip the keyring: the cookie store is then only protected by file permissions, as in most
+    // Electron apps. Windows is unaffected and keeps DPAPI.
     let cef = cef.secret_storage(tauri_runtime_cef::SecretStorage::Mock);
     // For driving the app from tests: SHARR_DEVTOOLS_PORT=9222
     #[cfg(debug_assertions)]
@@ -118,6 +119,8 @@ pub fn run() {
                     .permission("allow-system-audio-stop"),
             )?;
 
+            update::spawn_check(app.handle().clone());
+
             let handle = app.handle().clone();
             let app_origin = url.clone();
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.clone()))
@@ -142,7 +145,6 @@ pub fn run() {
             }
 
             single::set_app(app.handle().clone());
-            update::spawn_check(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
