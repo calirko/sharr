@@ -32,7 +32,7 @@ export function CopyLinkButton({ roomId, roomName, compact }: { roomId: string; 
     );
   }
   return (
-    <Button variant="secondary" size="sm" onClick={share}>
+    <Button variant="ghost" size="sm" title="Copy room link" onClick={share}>
       <Icon /> <span className="hidden sm:inline">{copied ? "Copied" : "Invite"}</span>
     </Button>
   );

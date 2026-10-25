@@ -19,7 +19,8 @@ import {
 } from "@/lib/quality";
 import { startShare, stopShare, updateShare } from "@/lib/share";
 
-export function ShareButton() {
+// `large` is the call to action in the empty room, with the label always shown
+export function ShareButton({ large }: { large?: boolean }) {
   const { localParticipant, isScreenShareEnabled } = useLocalParticipant();
   const [open, setOpen] = useState(false);
   const [quality, setQuality] = useState<QualityId>(loadQuality);
@@ -59,8 +60,8 @@ export function ShareButton() {
           </Button>
         </>
       ) : (
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <MonitorUp /> <span className="hidden sm:inline">Share</span>
+        <Button size={large ? "lg" : "sm"} onClick={() => setOpen(true)}>
+          <MonitorUp /> <span className={large ? undefined : "hidden sm:inline"}>{large ? "Share your screen" : "Share"}</span>
         </Button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>

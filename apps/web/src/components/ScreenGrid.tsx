@@ -1,7 +1,7 @@
 import { AudioTrack, useTracks, VideoTrack, type TrackReference } from "@livekit/components-react";
 import { RemoteTrackPublication, Track, VideoQuality } from "livekit-client";
 import { Maximize, MonitorUp, Play, Settings, Volume1, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ParticipantAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +25,7 @@ const viewQualities = [
 ] as const;
 type ViewQuality = (typeof viewQualities)[number]["id"];
 
-export function ScreenGrid({ tracks }: { tracks: TrackReference[] }) {
+export function ScreenGrid({ tracks, emptyAction }: { tracks: TrackReference[]; emptyAction?: ReactNode }) {
   const [focusSid, setFocusSid] = useState<string | null>(null);
   // Per sharer, kept here so it survives tiles remounting when the layout changes
   const [volumes, setVolumes] = useState<Record<string, Volume>>({});
@@ -56,9 +56,12 @@ export function ScreenGrid({ tracks }: { tracks: TrackReference[] }) {
   const focused = tracks.find((t) => t.publication.trackSid === focusSid);
   if (tracks.length === 0) {
     content = (
-      <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 text-sm">
-        <MonitorUp className="size-8" />
-        Nobody is sharing yet.
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+        <div className="bg-foreground/5 text-muted-foreground flex size-14 items-center justify-center rounded-full">
+          <MonitorUp className="size-6" />
+        </div>
+        <p className="text-muted-foreground text-sm">Nobody is sharing yet.</p>
+        {emptyAction}
       </div>
     );
   } else if (focused && tracks.length > 1) {

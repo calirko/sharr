@@ -5,20 +5,24 @@ import {
   useRoomContext,
   useTracks,
 } from "@livekit/components-react";
-import { Crown, LogOut, MessageSquare, Settings, Users } from "lucide-react";
+import { LogOut, MessageSquare, Settings } from "lucide-react";
 import { RoomEvent, Track, type RemoteParticipant, type RemoteTrackPublication } from "livekit-client";
 import { useEffect, useState } from "react";
+import { useDefaultLayout } from "react-resizable-panels";
 import { ChatPanel } from "@/components/ChatPanel";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { ParticipantList } from "@/components/ParticipantList";
 import { RoomSettingsDialog } from "@/components/RoomSettingsDialog";
 import { ScreenGrid } from "@/components/ScreenGrid";
 import { ShareButton } from "@/components/ShareButton";
-import { Badge } from "@/components/ui/badge";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import type { JoinInfo, Room } from "@/lib/api";
 import { playSound } from "@/lib/sounds";
 import { cn } from "@/lib/utils";
+
+// Same as the `side` variant in index.css
+const SIDE_QUERY = "(width >= 48rem), (orientation: landscape)";
 
 type Props = { room: Room; info: JoinInfo; onRoomChange: (room: Room) => void };
 
@@ -31,6 +35,13 @@ export function RoomView({ room, info, onRoomChange }: Props) {
   const canPlayVideo = useVideoPlayback();
   const [chatOpen, setChatOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const side = useMediaQuery(SIDE_QUERY);
+  // Sizes are remembered per layout, and with or without the sidebar
+  const mainLayout = useDefaultLayout({
+    id: side ? "room-side" : "room-stacked",
+    panelIds: chatOpen ? ["screens", "sidebar"] : ["screens"],
+  });
+  const sidebarLayout = useDefaultLayout({ id: "room-sidebar" });
 
   // Remote only: you already know when you start or stop your own share, or join
   useEffect(() => {
@@ -75,34 +86,36 @@ export function RoomView({ room, info, onRoomChange }: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-2 border-b px-3 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <h1 className="truncate text-lg font-extrabold tracking-tight">{room.name}</h1>
-          {info.is_creator && (
-            <Badge>
-              <Crown /> Owner
-            </Badge>
-          )}
+      <header className="flex h-13 shrink-0 items-center gap-2 border-b px-3">
+        <h1 className="min-w-0 flex-1 truncate font-semibold">{room.name}</h1>
+        <div className="flex items-center gap-2">
+          {canShare && screens.length > 0 && <ShareButton />}
+          <CopyLinkButton roomId={room.id} roomName={room.name} />
         </div>
-        <Badge variant="secondary">
-          <Users /> {participants.length}
-        </Badge>
-        {canShare && <ShareButton />}
-        <CopyLinkButton roomId={room.id} roomName={room.name} />
-        <Button
-          variant={chatOpen ? "secondary" : "ghost"}
-          size="icon"
-          title="Chat"
-          onClick={() => setChatOpen(!chatOpen)}
-        >
-          <MessageSquare />
-        </Button>
-        <Button variant="ghost" size="icon" title="Settings" onClick={() => setSettingsOpen(true)}>
-          <Settings />
-        </Button>
-        <Button variant="destructive" size="icon" title="Leave" onClick={() => lkRoom.disconnect()}>
-          <LogOut />
-        </Button>
+        <div className="bg-border mx-1 h-5 w-px" />
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            title="People and chat"
+            className={cn("tabular-nums", chatOpen && "bg-foreground/7 text-foreground")}
+            onClick={() => setChatOpen(!chatOpen)}
+          >
+            <MessageSquare /> {participants.length}
+          </Button>
+          <Button variant="ghost" size="icon-sm" title="Settings" onClick={() => setSettingsOpen(true)}>
+            <Settings />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Leave"
+            className="hover:bg-destructive/12 hover:text-destructive"
+            onClick={() => lkRoom.disconnect()}
+          >
+            <LogOut />
+          </Button>
+        </div>
       </header>
 
       {(!canPlayAudio || !canPlayVideo) && (
@@ -118,21 +131,38 @@ export function RoomView({ room, info, onRoomChange }: Props) {
         </button>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col side:flex-row">
-        <section className="flex min-h-0 flex-1 p-2">
-          <ScreenGrid tracks={screens} />
-        </section>
-        <aside
-          className={cn(
-            "side:w-[min(20rem,40vw)] side:border-t-0 side:border-l flex min-h-0 flex-col border-t",
-            screens.length > 0 ? "side:h-auto h-2/5" : "side:flex-none flex-1",
-            !chatOpen && "hidden",
-          )}
-        >
-          <ParticipantList creatorId={room.creator_id} />
-          <ChatPanel />
-        </aside>
-      </div>
+      <ResizablePanelGroup
+        key={side ? "side" : "stacked"}
+        orientation={side ? "horizontal" : "vertical"}
+        className="min-h-0 flex-1"
+        {...mainLayout}
+      >
+        <ResizablePanel id="screens" minSize="20%" className="flex p-2">
+          <ScreenGrid tracks={screens} emptyAction={canShare && <ShareButton large />} />
+        </ResizablePanel>
+        {chatOpen && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel
+              id="sidebar"
+              defaultSize={side ? "20rem" : "40%"}
+              minSize={side ? "14rem" : "20%"}
+              maxSize="70%"
+              groupResizeBehavior={side ? "preserve-pixel-size" : "preserve-relative-size"}
+            >
+              <ResizablePanelGroup orientation="vertical" {...sidebarLayout}>
+                <ResizablePanel id="people" defaultSize="30%" minSize="3rem">
+                  <ParticipantList creatorId={room.creator_id} />
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel id="chat" minSize="6rem" className="flex flex-col">
+                  <ChatPanel />
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
 
       <RoomSettingsDialog
         open={settingsOpen}
@@ -157,4 +187,15 @@ function useVideoPlayback() {
     };
   }, [room]);
   return canPlay;
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const update = () => setMatches(mql.matches);
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, [query]);
+  return matches;
 }

@@ -2,7 +2,6 @@ import { useParticipants } from "@livekit/components-react";
 import { Crown, MonitorUp } from "lucide-react";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { ParticipantAvatar } from "@/components/UserAvatar";
-import { Badge } from "@/components/ui/badge";
 
 export function ParticipantList({ creatorId }: { creatorId: string }) {
   const participants = useParticipants();
@@ -10,31 +9,35 @@ export function ParticipantList({ creatorId }: { creatorId: string }) {
   const sorted = [...participants].sort((a, b) => Number(b.identity === creatorId) - Number(a.identity === creatorId));
 
   return (
-    <section className="flex max-h-32 shrink-0 flex-col border-b side:max-h-[40%]">
-      <h2 className="text-muted-foreground px-3 pt-3 pb-1 text-xs font-bold">In the room ({participants.length})</h2>
-      <ul className="flex flex-col gap-1.5 overflow-y-auto px-3 pb-3 text-sm">
+    <section className="flex h-full flex-col">
+      <h2 className="text-muted-foreground shrink-0 px-3 pt-3 pb-1.5 text-xs font-medium">People</h2>
+      <ul className="flex min-h-0 flex-col gap-0.5 overflow-y-auto px-1.5 pb-2 text-sm">
         {sorted.map((p) => (
-          <li key={p.identity} className="flex items-center gap-2">
-            <ParticipantAvatar participant={p} />
-            <span className="min-w-0 truncate">
+          <li key={p.identity} className="flex h-8 items-center gap-2 rounded-md px-1.5">
+            <span className="relative">
+              <ParticipantAvatar participant={p} />
+              {p.attributes.discord_username && (
+                <span
+                  title={`Discord: ${p.attributes.discord_username}`}
+                  className="bg-background absolute -right-1 -bottom-1 flex rounded-full p-px text-[#5865F2]"
+                >
+                  <DiscordIcon className="size-2.5" />
+                </span>
+              )}
+            </span>
+            <span className="min-w-0 flex-1 truncate">
               {p.name || p.identity}
-
               {p.isLocal && <span className="text-muted-foreground"> (you)</span>}
             </span>
-            {p.attributes.discord_username && (
-              <span title={`Discord: ${p.attributes.discord_username}`} className="text-[#5865F2]">
-                <DiscordIcon className="size-3.5" />
+            {p.isScreenShareEnabled && (
+              <span title="Sharing" className="text-primary">
+                <MonitorUp className="size-3.5" />
               </span>
             )}
             {p.identity === creatorId && (
-              <Badge>
-                <Crown /> Owner
-              </Badge>
-            )}
-            {p.isScreenShareEnabled && (
-              <Badge variant="secondary">
-                <MonitorUp /> Sharing
-              </Badge>
+              <span title="Owner" className="text-amber-400">
+                <Crown className="size-3.5" />
+              </span>
             )}
           </li>
         ))}
