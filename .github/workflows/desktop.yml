@@ -24,9 +24,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            bundles: appimage
           - os: windows-latest
-            bundles: nsis
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -48,7 +46,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libpipewire-0.3-dev libclang-dev patchelf
+          sudo apt-get install -y libgtk-4-dev libpipewire-0.3-dev libpulse0 libclang-dev patchelf
 
       - run: bun install --frozen-lockfile
 
@@ -61,7 +59,6 @@ jobs:
         run: |
           for dir in "${CEF_PATH//\\//}"/*/cef_*; do
             [ -d "$dir" ] || continue
-            ls "$dir"
             for f in libEGL.so libGLESv2.so libEGL.dll libGLESv2.dll; do
               case "$dir:$f" in *linux*:*.so|*windows*:*.dll) [ -e "$dir/$f" ] || : > "$dir/$f" ;; esac
             done
@@ -71,7 +68,12 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: bun run tauri build --bundles ${{ matrix.bundles }}
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            bun run tauri build --bundles appimage --config "$(scripts/appimage-pipewire.sh)"
+          else
+            bun run tauri build --bundles nsis
+          fi
 
       - uses: actions/upload-artifact@v4
         with:

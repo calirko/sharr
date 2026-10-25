@@ -58,7 +58,13 @@ fn desktop_info(app: tauri::AppHandle) -> DesktopInfo {
 }
 
 fn cef() -> tauri_runtime_cef::Cef {
-    let cef = tauri_runtime_cef::Cef::default().persist_session_cookies(true);
+    let cef = tauri_runtime_cef::Cef::default()
+        .persist_session_cookies(true)
+        // The window only shows our own pages, and room audio should play without a click first
+        .autoplay(tauri_runtime_cef::AutoplayPolicy::NoUserGestureRequired);
+    // Debug builds never touch the system keyring, so test runs don't stop at an unlock prompt
+    #[cfg(debug_assertions)]
+    let cef = cef.secret_storage(tauri_runtime_cef::SecretStorage::Mock);
     // For driving the app from tests: SHARR_DEVTOOLS_PORT=9222
     #[cfg(debug_assertions)]
     if let Some(port) = std::env::var("SHARR_DEVTOOLS_PORT").ok().and_then(|p| p.parse().ok()) {
@@ -73,6 +79,8 @@ pub fn run() {
     if !helper && !single::acquire() {
         return;
     }
+    #[cfg(target_os = "linux")]
+    sysaudio::use_bundled_pipewire();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("sharr_lib=info")).init();
     let url = app_url();
 
@@ -124,6 +132,14 @@ pub fn run() {
                     false
                 })
                 .build()?;
+
+            // For testing a bundle without devtools: SHARR_SYSAUDIO_TEST=1
+            #[cfg(all(debug_assertions, target_os = "linux"))]
+            if std::env::var_os("SHARR_SYSAUDIO_TEST").is_some() {
+                tauri::async_runtime::spawn(async {
+                    log::info!("system audio test: {:?}", sysaudio::system_audio_start().await);
+                });
+            }
 
             single::set_app(app.handle().clone());
             update::spawn_check(app.handle().clone());
