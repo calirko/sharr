@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { CenterStack } from "@/components/Layout";
 
 // Test page for running inside a Discord Activity (calico app, URL mapping `/` to this server).
-// Checks the SDK handshake and whether WebRTC can get out of Discord's proxy.
+// Checks the SDK handshake, whether WebRTC can get out of Discord's proxy, and what a
+// non-WebRTC player (HLS over MSE, or WebCodecs over a websocket) would have to work with.
 export function ActivityPage() {
   const [info, setInfo] = useState<Record<string, string>>({ status: "connecting", webrtc: "testing" });
   const set = (key: string, value: string) => setInfo((prev) => ({ ...prev, [key]: value }));
@@ -53,6 +54,23 @@ export function ActivityPage() {
       set("webrtc", `error: ${errText(err)}`);
     }
 
+    set("rtc global", typeof window.RTCPeerConnection);
+    set("mse", typeof MediaSource !== "undefined" && MediaSource.isTypeSupported('video/mp4; codecs="avc1.640028"') ? "h264 ok" : "no");
+    set("webcodecs", typeof VideoDecoder !== "undefined" ? "yes" : "no");
+    set("display capture", typeof navigator.mediaDevices?.getDisplayMedia);
+
+    // Through the root mapping: our API, and LiveKit's HTTP endpoint behind the /rtc tunnel route
+    probeHttp("/api/health").then((r) => set("api", r));
+    probeHttp("/rtc/validate").then((r) => set("livekit http", r));
+
+    try {
+      const ws = new WebSocket(`wss://${location.host}/api/activity-probe`);
+      ws.onmessage = (e) => set("websocket", `message: ${e.data}`);
+      ws.onerror = () => set("websocket", "error");
+    } catch (err) {
+      set("websocket", `error: ${errText(err)}`);
+    }
+
     return () => {
       window.removeEventListener("error", onError);
       clearTimeout(timer);
@@ -78,4 +96,13 @@ export function ActivityPage() {
 
 function errText(err: unknown) {
   return err instanceof Error ? err.message : String(err);
+}
+
+async function probeHttp(path: string) {
+  try {
+    const res = await fetch(path);
+    return `${res.status} ${res.headers.get("server") ?? ""}`.trim();
+  } catch (err) {
+    return `error: ${errText(err)}`;
+  }
 }
