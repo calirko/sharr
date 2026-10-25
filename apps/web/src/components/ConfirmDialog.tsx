@@ -1,3 +1,4 @@
+import { X, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,11 +18,12 @@ type Props = {
   title: string;
   description: ReactNode;
   confirmLabel: string;
+  confirmIcon: LucideIcon;
   onConfirm: () => Promise<unknown>;
 };
 
 // Closes on success, toasts the error and stays open otherwise
-export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel, onConfirm }: Props) {
+export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel, confirmIcon: Icon, onConfirm }: Props) {
   const [busy, setBusy] = useState(false);
 
   async function confirm() {
@@ -45,10 +47,10 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            <X /> Cancel
           </Button>
           <Button variant="destructive" disabled={busy} onClick={confirm}>
-            {confirmLabel}
+            <Icon /> {confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -56,7 +56,9 @@ export function AdminPage() {
       <main className="flex min-h-dvh flex-col justify-center p-4">
         <CenterStack icon={SearchX} text="Page not found.">
           <Button variant="outline" asChild>
-            <Link href="/">Back to rooms</Link>
+            <Link href="/">
+              <ArrowLeft /> Back to rooms
+            </Link>
           </Button>
         </CenterStack>
       </main>
@@ -138,12 +140,14 @@ export function AdminPage() {
                 title: "Close room",
                 description: `${pending.room.known ? pending.room.name : pending.room.id} will close and everyone in it is disconnected.`,
                 confirmLabel: "Close room",
+                confirmIcon: Trash2,
                 onConfirm: () => api.admin.closeRoom(pending.room.id).then(load),
               }
             : {
                 title: "Remove from room",
                 description: `${pending.participant.name || pending.participant.identity} will be disconnected. They can't rejoin until the room closes.`,
                 confirmLabel: "Remove",
+                confirmIcon: UserX,
                 onConfirm: () => api.admin.kick(pending.room.id, pending.participant.identity).then(load),
               })}
         />

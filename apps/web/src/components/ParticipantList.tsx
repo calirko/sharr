@@ -61,6 +61,7 @@ export function ParticipantList({ roomId, creatorId, canKick }: { roomId: string
           title="Remove from room"
           description={`${kicking.name || kicking.identity} will be disconnected. They can't rejoin until the room closes.`}
           confirmLabel="Remove"
+          confirmIcon={UserX}
           onConfirm={() => api.kick(roomId, kicking.identity)}
         />
       )}

@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,7 +32,7 @@ export function RenameDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <Input autoFocus maxLength={32} value={nickname} onChange={(e) => setNickname(e.target.value)} />
           <DialogFooter>
             <Button type="submit" disabled={!nickname.trim()}>
-              Save
+              <Check /> Save
             </Button>
           </DialogFooter>
         </form>

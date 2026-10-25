@@ -1,3 +1,4 @@
+import { LogIn } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ export function NicknameForm() {
               />
             </div>
             <Button type="submit" disabled={busy || !nickname.trim()}>
-              Continue as guest
+              <LogIn /> Continue as guest
             </Button>
           </>
         )}

@@ -1,5 +1,6 @@
 import { LiveKitRoom } from "@livekit/components-react";
 import { DisconnectReason } from "livekit-client";
+import { ArrowLeft, LogIn, RotateCw, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { RoomView } from "@/components/RoomView";
@@ -96,9 +97,15 @@ export function RoomPage({ id }: { id: string }) {
       <Centered>
         <p>{state.text}</p>
         <div className="flex gap-2">
-          {state.rejoin && <Button onClick={load}>Rejoin</Button>}
+          {state.rejoin && (
+            <Button onClick={load}>
+              <RotateCw /> Rejoin
+            </Button>
+          )}
           <Button variant="outline" asChild>
-            <Link href="/">Back to rooms</Link>
+            <Link href="/">
+              <ArrowLeft /> Back to rooms
+            </Link>
           </Button>
         </div>
       </Centered>
@@ -144,10 +151,12 @@ function PinForm({ room, onSubmit }: { room: Room; onSubmit: (pin: string) => vo
         />
         <div className="flex gap-2">
           <Button type="submit" className="flex-1" disabled={!pin}>
-            Join
+            <LogIn /> Join
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/">Cancel</Link>
+            <Link href="/">
+              <X /> Cancel
+            </Link>
           </Button>
         </div>
       </form>

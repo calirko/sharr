@@ -1,5 +1,5 @@
 import { useLocalParticipant } from "@livekit/components-react";
-import { MonitorOff, MonitorUp, SlidersHorizontal } from "lucide-react";
+import { Check, MonitorOff, MonitorUp, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -105,7 +105,15 @@ export function ShareButton({ large }: { large?: boolean }) {
           </div>
           <DialogFooter>
             <Button onClick={submit} disabled={busy}>
-              {isScreenShareEnabled ? "Apply" : "Start sharing"}
+              {isScreenShareEnabled ? (
+                <>
+                  <Check /> Apply
+                </>
+              ) : (
+                <>
+                  <MonitorUp /> Start sharing
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

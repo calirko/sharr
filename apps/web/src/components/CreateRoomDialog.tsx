@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ export function CreateRoomDialog({ open, onOpenChange }: { open: boolean; onOpen
           </div>
           <DialogFooter>
             <Button type="submit" disabled={busy || !name.trim() || !pinValid}>
-              Create
+              <Plus /> Create
             </Button>
           </DialogFooter>
         </form>

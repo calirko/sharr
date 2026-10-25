@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ShareModeSelect } from "@/components/ShareModeSelect";
 import { Button } from "@/components/ui/button";
@@ -103,11 +104,11 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
             <div className="flex justify-end">
               {confirmClose ? (
                 <Button variant="destructive" onClick={close}>
-                  Close room for everyone
+                  <Trash2 /> Close room for everyone
                 </Button>
               ) : (
                 <Button variant="outline" onClick={() => setConfirmClose(true)}>
-                  Close room
+                  <Trash2 /> Close room
                 </Button>
               )}
             </div>
