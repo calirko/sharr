@@ -3,6 +3,12 @@
 @import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
+/* Side-by-side room layout: wide screens, and phones turned sideways */
+@custom-variant side {
+  @media (width >= 48rem), (orientation: landscape) {
+    @slot;
+  }
+}
 
 :root {
   --radius: 0.625rem;

@@ -61,7 +61,7 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
         </DialogHeader>
 
         <section className="flex flex-col gap-3">
-          <h3 className="text-muted-foreground text-xs font-medium">Sounds</h3>
+          <h3 className="text-muted-foreground text-xs font-bold">Sounds</h3>
           <div className="flex items-center justify-between gap-4">
             <Label htmlFor="sound-chat">New chat messages</Label>
             <Switch id="sound-chat" checked={sounds.chat} onCheckedChange={(v) => setSound("chat", v)} />
@@ -78,7 +78,7 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
 
         {isCreator && (
           <section className="flex flex-col gap-3 border-t pt-4">
-            <h3 className="text-muted-foreground text-xs font-medium">Room</h3>
+            <h3 className="text-muted-foreground text-xs font-bold">Room</h3>
             <div className="flex flex-col gap-2">
               <Label>Who can share</Label>
               <ShareModeSelect value={room.share_mode} onChange={setShareMode} />

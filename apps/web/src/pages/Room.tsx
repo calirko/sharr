@@ -130,7 +130,7 @@ function PinForm({ room, error, onSubmit }: { room: Room; error?: string; onSubm
   return (
     <Centered>
       <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-4">
-        <h1 className="truncate text-xl font-semibold">{room.name}</h1>
+        <h1 className="truncate text-xl font-extrabold tracking-tight">{room.name}</h1>
         <Input
           autoFocus
           inputMode="numeric"

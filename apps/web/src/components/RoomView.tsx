@@ -77,7 +77,7 @@ export function RoomView({ room, info, onRoomChange }: Props) {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b px-3 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <h1 className="truncate font-semibold">{room.name}</h1>
+          <h1 className="truncate text-lg font-extrabold tracking-tight">{room.name}</h1>
           {info.is_creator && (
             <Badge>
               <Crown /> Owner
@@ -118,14 +118,14 @@ export function RoomView({ room, info, onRoomChange }: Props) {
         </button>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col side:flex-row">
         <section className="flex min-h-0 flex-1 p-2">
           <ScreenGrid tracks={screens} />
         </section>
         <aside
           className={cn(
-            "flex min-h-0 flex-col border-t md:w-80 md:border-t-0 md:border-l",
-            screens.length > 0 ? "h-2/5 md:h-auto" : "flex-1 md:flex-none",
+            "side:w-[min(20rem,40vw)] side:border-t-0 side:border-l flex min-h-0 flex-col border-t",
+            screens.length > 0 ? "side:h-auto h-2/5" : "side:flex-none flex-1",
             !chatOpen && "hidden",
           )}
         >
