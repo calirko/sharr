@@ -1,0 +1,109 @@
+name: desktop
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CEF_PATH: ${{ github.workspace }}/.cef
+  # The upstream copies of these moved; pinned to the fork the Tauri bundler already uses
+  ANYLINUX_LIB_SOURCE: https://raw.githubusercontent.com/FabianLars/Anylinux-AppImages/3e280d1b2270fecfcb2c2c823b490c782ecf1277/useful-tools/lib/anylinux.c
+  GTK_CLASS_FIX_SOURCE: https://raw.githubusercontent.com/FabianLars/Anylinux-AppImages/3e280d1b2270fecfcb2c2c823b490c782ecf1277/useful-tools/lib/gtk-class-fix.c
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            bundles: appimage
+          - os: windows-latest
+            bundles: nsis
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - uses: actions/cache@v4
+        with:
+          path: .cef
+          key: cef-${{ runner.os }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+
+      - name: Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libpipewire-0.3-dev libclang-dev patchelf
+
+      - run: bun install --frozen-lockfile
+
+      # Downloads the CEF distribution into CEF_PATH
+      - run: cargo build --release --manifest-path src-tauri/Cargo.toml -p cef-dll-sys
+
+      # CEF 154 no longer ships the ANGLE libraries the Tauri bundler still copies.
+      # Chromium doesn't load them, so empty files are enough.
+      - name: CEF placeholders
+        run: |
+          for dir in "${CEF_PATH//\\//}"/*/cef_*; do
+            for f in libEGL.so libGLESv2.so libEGL.dll libGLESv2.dll; do
+              case "$dir:$f" in *linux*:*.so|*windows*:*.dll) [ -e "$dir/$f" ] || : > "$dir/$f" ;; esac
+            done
+          done
+
+      - name: Build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bun run tauri build --bundles ${{ matrix.bundles }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ runner.os }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage.sig
+            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
+          [ "desktop-v$version" = "$TAG" ] || { echo "tag $TAG does not match version $version"; exit 1; }
+          appimage=$(cd dist && ls *.AppImage)
+          setup=$(cd dist && ls *-setup.exe)
+          base="https://github.com/${{ github.repository }}/releases/download/$TAG"
+          jq -n \
+            --arg v "$version" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg lsig "$(cat "dist/$appimage.sig")" --arg lurl "$base/$appimage" \
+            --arg wsig "$(cat "dist/$setup.sig")" --arg wurl "$base/$setup" \
+            '{version: $v, pub_date: $date, platforms: {
+              "linux-x86_64": {signature: $lsig, url: $lurl},
+              "windows-x86_64": {signature: $wsig, url: $wurl}}}' > dist/latest.json
+          gh release create "$TAG" --title "sharr desktop $version" --notes "Desktop app $version" dist/*

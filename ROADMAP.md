@@ -22,7 +22,7 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [x] Real `.env` in Dokploy, generated with `scripts/gen-env.sh`
 - [x] Smoke test from outside: `/api/health` ok, `/rtc/validate` reaches LiveKit
 - [x] Router forwards `7882/udp`, `7881/tcp`, `3478/udp` from `177.126.154.73` to dragon (7881/tcp open, 3478/udp answers STUN; no host firewall)
-- [ ] Media test from outside the network, incl. a phone on mobile data for NAT/TURN (needs M3)
+- [x] Media test from outside the network, incl. a phone on mobile data for NAT/TURN (needs M3)
 
 ## M3 — Web app (`apps/web`), tested on prod
 - [x] Vite + React + Tailwind + shadcn, served by the `sharr` container
@@ -32,8 +32,8 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [x] Chat over LiveKit data channels
 - [x] Responsive layout (mobile viewing, desktop sharing)
 - [x] Local headless test (two browsers): PIN, share, receive 1080p, chat, live share permission change, stop, close room
-- [ ] Deploy and test on `https://sharr.calirko.com` (incl. the M2 phone-on-mobile-data media test)
-- [ ] Verify on Windows Chrome/Firefox and Linux Wayland (portal + PipeWire), incl. tab/system audio
+- [x] Deploy and test on `https://sharr.calirko.com` (incl. the M2 phone-on-mobile-data media test)
+- [x] Verify on Chrome, Firefox and iOS Safari, incl. tab/system audio where the browser supports it
   - Firefox on Hyprland: picture goes green or the share stops after switching workspaces, portal bug (see `docs/known-issues/hyprland-portal-green-frames.md`)
   - Firefox publishes no audio track with the share (seen in LiveKit logs); Chrome does. Retest Chrome tab vs whole-screen audio on Linux
   - Zen (Firefox 157, Linux) never got a media connection on prod while a WireGuard interface was up (joins ended after 15s with `SIGNAL_SOURCE_CLOSE`); Chrome was fine. Works with the VPN down. Local setup, not a sharr bug; workaround is `media.peerconnection.ice.force_interface`
@@ -51,11 +51,17 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 - [ ] Grant the first admin on prod and check the page there
 
 ## M6 — Hardening
-- [ ] Rate limits on login/join/PIN attempts
+- [x] Rate limits on login/join/PIN attempts
 - [ ] Quality tuning on real networks (bitrate tiers, codec choice, TURN usage)
 - [ ] Decide on TURN/TLS (own hostname) if UDP-blocked networks are a problem
 
-## M7 — Desktop (Tauri, Windows + Linux)
-- [ ] Wrap the web app first; check whether webview `getDisplayMedia` is good enough
-- [ ] Spike native capture if not: Linux portal + PipeWire, Windows Graphics Capture, publish through LiveKit Rust SDK (verify crate choices first)
+## M7 — Desktop app (Tauri, Linux + Windows)
+Main reason it exists: share system audio on Linux, which no browser can do (`getDisplayMedia` there only gives tab audio in Chrome, none in Firefox). Discord login is required, no guests.
+- [ ] Tauri shell in `apps/desktop` loading the web app from `https://sharr.calirko.com`
+- [ ] Discord login in the app: guests are not offered. Pick a flow that works in a webview (system browser plus deep link back, or OAuth inside the webview) and check Discord allows it
+- [ ] Server side: tell desktop clients apart only as far as needed (no new trust in the client)
+- [ ] Linux capture: xdg-desktop-portal ScreenCast + PipeWire for video, PipeWire monitor of the default output for system audio (exclude sharr's own playback so viewers don't hear an echo of the room)
+- [ ] Windows capture: Windows Graphics Capture for video, WASAPI loopback for system audio
+- [ ] Publish through the LiveKit Rust SDK (`NativeVideoSource` I420, `NativeAudioSource`), same 1080p60 cap and bitrate tiers as the web app (verify crate choices and versions first)
+- [ ] Check whether the webview's own `getDisplayMedia` is enough for video on each OS, and only go native where it isn't
 - [ ] Signed auto-update via Tauri updater, CI builds + GitHub Releases on this public repo (Linux: AppImage)
