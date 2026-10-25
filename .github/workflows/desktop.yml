@@ -71,7 +71,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            bun run tauri build --bundles appimage --config "$(scripts/appimage-libs.sh)"
+            bun run tauri build --verbose --bundles appimage --config "$(scripts/appimage-libs.sh)"
           else
             bun run tauri build --bundles nsis
           fi
