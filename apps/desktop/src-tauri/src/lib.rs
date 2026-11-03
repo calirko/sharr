@@ -7,6 +7,7 @@ mod sysaudio;
 mod sysaudio;
 mod link;
 mod login;
+mod sharebar;
 mod single;
 mod update;
 
@@ -40,6 +41,7 @@ mod sysaudio {
 use tauri::ipc::CapabilityBuilder;
 use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::{Manager, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 
 const APP_URL: &str = "https://sharr.calirko.com";
@@ -96,12 +98,15 @@ pub fn run() {
         .runtime(cef())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
+        // Replaces the page's window.Notification with the platform's own notifications
+        .plugin(tauri_plugin_notification::init())
         .manage(update::Pending::default())
         .manage(login::AppUrl(url.clone()))
         .invoke_handler(tauri::generate_handler![
             update::update_pending,
             update::update_install,
             login::browser_login,
+            sharebar::hide_share_bar,
             sysaudio::system_audio_supported,
             sysaudio::system_audio_start,
             sysaudio::system_audio_stop,
@@ -131,11 +136,34 @@ pub fn run() {
                     .permission("allow-update-pending")
                     .permission("allow-update-install")
                     .permission("allow-browser-login")
+                    .permission("allow-hide-share-bar")
                     .permission("allow-system-audio-supported")
                     .permission("allow-system-audio-start")
                     .permission("allow-system-audio-stop")
-                    .permission("allow-system-audio-include-discord"),
+                    .permission("allow-system-audio-include-discord")
+                    .permission("notification:allow-notify")
+                    .permission("notification:allow-is-permission-granted")
+                    .permission("notification:allow-request-permission")
+                    // The page draws the title bar (TitleBar.tsx)
+                    .permission("core:window:allow-is-decorated")
+                    .permission("core:window:allow-is-maximized")
+                    .permission("core:window:allow-minimize")
+                    .permission("core:window:allow-toggle-maximize")
+                    .permission("core:window:allow-internal-toggle-maximize")
+                    .permission("core:window:allow-close")
+                    .permission("core:window:allow-start-dragging")
+                    .permission("core:window:allow-start-resize-dragging"),
             )?;
+
+            // A click on a notification brings the window back, like the page's own did
+            let handle = app.handle().clone();
+            app.notification().on_action(move |_| {
+                if let Some(w) = handle.get_webview_window("main") {
+                    let _ = w.unminimize();
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            })?;
 
             update::spawn_check(app.handle().clone());
             // Debug builds would take the links away from the installed app
@@ -150,6 +178,9 @@ pub fn run() {
                 .title("sharr")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(360.0, 480.0)
+                // The page draws its own title bar
+                .decorations(false)
+                .shadow(true)
                 .on_navigation(move |to| {
                     if allowed_in_app(to, &app_origin) {
                         return true;

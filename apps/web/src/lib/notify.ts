@@ -1,6 +1,8 @@
 // Desktop notifications while the app is open but not focused. Shown by the page itself
 // through the service worker, so there is no push server. Discord users only.
 
+import { isDesktop } from "./desktop";
+
 export type NotifyPrefs = { enabled: boolean; messages: boolean; presence: boolean };
 export type NotifyState = "unsupported" | "denied" | "granted" | "default";
 type Kind = "messages" | "presence";
@@ -48,8 +50,16 @@ export function registerServiceWorker() {
 type Message = { title: string; body: string; tag: string; url: string; icon?: string };
 
 async function show({ title, body, tag, url, icon }: Message) {
+  body = body.length > MAX_BODY ? `${body.slice(0, MAX_BODY)}...` : body;
+  // The desktop app replaces Notification with the platform's own notifications, and a click
+  // focuses the window from the app's side. They take no tag or URL icon.
+  if (isDesktop) {
+    const n = new Notification(title, { body });
+    n.onclick = () => window.focus();
+    return;
+  }
   const options = {
-    body: body.length > MAX_BODY ? `${body.slice(0, MAX_BODY)}...` : body,
+    body,
     tag,
     // A new message with the same tag still alerts, instead of replacing the old one silently
     renotify: true,

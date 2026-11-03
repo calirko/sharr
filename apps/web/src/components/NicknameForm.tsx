@@ -68,7 +68,7 @@ export function NicknameForm() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center p-4">
+    <main className="flex min-h-app items-center justify-center p-4">
       <RepoLink className="fixed top-2 right-3" />
       <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-4">
         <Logo className="gap-3" textClassName="text-3xl" />

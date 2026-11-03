@@ -1,6 +1,6 @@
 [package]
 name = "sharr"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 publish = false
 
@@ -17,6 +17,8 @@ tauri = { version = "=3.0.0-alpha.5", features = [] }
 tauri-runtime-cef = "=3.0.0-alpha.6"
 tauri-plugin-updater = "=3.0.0-alpha.3"
 tauri-plugin-opener = "=3.0.0-alpha.3"
+# Native notifications (D-Bus, WinRT toasts) instead of Chromium's own popups
+tauri-plugin-notification = "=3.0.0-alpha.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
@@ -36,6 +38,7 @@ windows = { version = "0.62", features = [
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_Threading",
     "Win32_System_Variant",
+    "Win32_UI_WindowsAndMessaging",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]

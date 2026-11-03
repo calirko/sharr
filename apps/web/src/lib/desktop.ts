@@ -113,6 +113,9 @@ export async function browserLogin() {
   return (await api.desktopRedeem(code)).user;
 }
 
+// Hides Chromium's "sharing your screen" bar, the room has its own Stop button (Windows only)
+export const hideShareBar = () => tauri?.core.invoke("hide_share_bar").catch(() => {});
+
 export async function stopSystemAudio() {
   audioCtx?.close();
   audioCtx = null;
@@ -138,3 +141,22 @@ export function watchUpdates() {
   tauri.core.invoke<string | null>("update_pending").then((v) => v && showUpdate(v), () => {});
   tauri.event.listen<string>("update-ready", (e) => showUpdate(e.payload));
 }
+
+export type ResizeEdge = "North" | "South" | "East" | "West" | "NorthEast" | "NorthWest" | "SouthEast" | "SouthWest";
+
+// The app draws its own title bar when the window has no system one. Apps from before 0.1.10
+// keep the system's and don't allow is_decorated, so this resolves false there.
+export const ownTitleBar: Promise<boolean> = isDesktop
+  ? tauri!.core.invoke<boolean>("plugin:window|is_decorated").then(
+      (d) => !d,
+      () => false,
+    )
+  : Promise.resolve(false);
+
+export const appWindow = {
+  minimize: () => tauri!.core.invoke("plugin:window|minimize"),
+  toggleMaximize: () => tauri!.core.invoke("plugin:window|toggle_maximize"),
+  close: () => tauri!.core.invoke("plugin:window|close"),
+  isMaximized: () => tauri!.core.invoke<boolean>("plugin:window|is_maximized"),
+  startResize: (value: ResizeEdge) => tauri!.core.invoke("plugin:window|start_resize_dragging", { value }),
+};

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "sharr",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "identifier": "com.calirko.sharr",
   "build": {
     "frontendDist": "../placeholder"
@@ -21,7 +21,8 @@
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
         "sidebarImage": "nsis/sidebar.bmp",
-        "headerImage": "nsis/header.bmp"
+        "headerImage": "nsis/header.bmp",
+        "installerHooks": "nsis/hooks.nsh"
       }
     }
   },

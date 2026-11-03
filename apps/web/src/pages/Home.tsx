@@ -34,7 +34,7 @@ export function Home() {
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex h-app flex-col">
       <TopBar>
         <h1 className="min-w-0 flex-1">
           <Logo />

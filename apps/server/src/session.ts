@@ -46,7 +46,7 @@ export const sessionMiddleware: MiddlewareHandler<SessionEnv> = async (c, next) 
     const session = await loadSession(sid);
     if (session) c.set("session", session);
     // Gone or expired, so the browser can stop sending it
-    else deleteCookie(c, COOKIE, { path: "/" });
+    else deleteCookie(c, COOKIE, { path: "/", secure: config.production });
   }
   await next();
 };
@@ -158,7 +158,7 @@ export async function setNickname(session: Session, nickname: string) {
 
 export async function destroySession(c: Context, session: Session) {
   await dropSession(session);
-  deleteCookie(c, COOKIE, { path: "/" });
+  deleteCookie(c, COOKIE, { path: "/", secure: config.production });
 }
 
 // Drops the old session without touching the cookie, for when a new one replaces it

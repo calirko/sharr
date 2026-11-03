@@ -7,7 +7,7 @@ import {
   type LocalParticipant,
 } from "livekit-client";
 import { toast } from "sonner";
-import { hasNativeSystemAudio, nativeAudioReady, stopSystemAudio, systemAudioTrack } from "./desktop";
+import { hasNativeSystemAudio, hideShareBar, nativeAudioReady, stopSystemAudio, systemAudioTrack } from "./desktop";
 import { AUTO_START, qualityTiers, tierIndex, type Fps, type QualityId, type QualityTier, type TierId } from "./quality";
 
 // One share per page at most, so the share's settings live here
@@ -52,7 +52,7 @@ function maxBitrate(quality: QualityId, tier: TierId) {
 // restrictOwnAudio keeps the room's own playback out of system audio where Chrome supports it.
 async function captureTracks(lp: LocalParticipant, tier: QualityTier, fps: Fps) {
   await nativeAudioReady;
-  return lp.createScreenTracks({
+  const tracks = await lp.createScreenTracks({
     audio: hasNativeSystemAudio
       ? false
       : ({
@@ -68,6 +68,8 @@ async function captureTracks(lp: LocalParticipant, tier: QualityTier, fps: Fps) 
     resolution: { width: widthOf(tier), height: tier.height, frameRate: fps },
     contentHint: "motion",
   });
+  hideShareBar();
+  return tracks;
 }
 
 function publishAudio(lp: LocalParticipant, track: LocalAudioTrack) {

@@ -78,5 +78,5 @@ export function DesktopLoginPage() {
     );
   }
 
-  return <main className="flex min-h-dvh flex-col items-center justify-center p-4">{content}</main>;
+  return <main className="flex min-h-app flex-col items-center justify-center p-4">{content}</main>;
 }

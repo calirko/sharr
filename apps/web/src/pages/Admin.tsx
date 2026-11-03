@@ -53,7 +53,7 @@ export function AdminPage() {
 
   if (!user?.is_admin) {
     return (
-      <main className="flex min-h-dvh flex-col justify-center p-4">
+      <main className="flex min-h-app flex-col justify-center p-4">
         <CenterStack icon={SearchX} text="Page not found.">
           <Button variant="outline" asChild>
             <Link href="/">
@@ -66,7 +66,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex h-app flex-col">
       <TopBar>
         <h1 className="flex min-w-0 flex-1 items-center gap-3">
           <Logo />

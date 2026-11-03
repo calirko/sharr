@@ -4,6 +4,14 @@
 @import "@fontsource-variable/space-grotesk";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Full page height, minus the desktop app's title bar when it draws its own (TitleBar.tsx) */
+@utility h-app {
+  height: calc(100dvh - var(--titlebar-h, 0px));
+}
+@utility min-h-app {
+  min-height: calc(100dvh - var(--titlebar-h, 0px));
+}
 /* Side-by-side room layout: wide screens, and phones turned sideways */
 @custom-variant side {
   @media (width >= 48rem), (orientation: landscape) {

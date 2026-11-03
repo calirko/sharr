@@ -122,7 +122,7 @@ export function RoomPage({ id }: { id: string }) {
       options={{ adaptiveStream: true, dynacast: true }}
       onDisconnected={onDisconnected}
       onError={onError}
-      className="h-dvh"
+      className="h-app"
     >
       <RoomView
         room={state.room}
@@ -167,5 +167,5 @@ function PinForm({ room, onSubmit }: { room: Room; onSubmit: (pin: string) => vo
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <main className="flex min-h-dvh flex-col items-center justify-center gap-4 p-4 text-center">{children}</main>;
+  return <main className="flex min-h-app flex-col items-center justify-center gap-4 p-4 text-center">{children}</main>;
 }
