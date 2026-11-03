@@ -42,13 +42,13 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 ## M4 — Discord login + history
 - [x] Discord OAuth2 (`identify` only), identity shown in rooms (`@username`, avatar; guests get their first letter)
 - [x] Persist chat for logged-in users in Redis (backlog, `chat` stream)
-- [ ] Create the Discord app, add `https://sharr.calirko.com/api/auth/discord/callback` as redirect, set `DISCORD_*` in Dokploy, test login on prod
+- [x] Create the Discord app, add `https://sharr.calirko.com/api/auth/discord/callback` as redirect, set `DISCORD_*` in Dokploy, test login on prod
 
 ## M5 — Admin
 - [x] Admin CLI (`list`, `grant` / `revoke` `is_admin`), talks to Redis directly
 - [x] Admin API with server-side flag check on every route
 - [x] `/admin` page: live rooms and participants, kick, close, users (tested locally with a faked Discord session)
-- [ ] Grant the first admin on prod and check the page there
+- [x] Grant the first admin on prod and check the page there
 
 ## M6 — Hardening
 - [x] Rate limits on login/join/PIN attempts
@@ -62,8 +62,8 @@ Main reason it exists: share system audio on Linux, which no browser can do (`ge
 - [x] Server side: nothing needed. The web app only uses `window.__TAURI__` to adjust its UI
 - [x] Linux video: Chromium's `getDisplayMedia` (portal + PipeWire). Still needs a real share through the Hyprland portal picker
 - [x] Linux system audio: virtual PipeWire source fed by every app except sharr itself, captured by the page and published as the share's audio (tested locally: links, exclusion, cleanup, a viewer receives stereo 48 kHz)
-- [ ] Windows: system audio from Chromium's picker with `restrictOwnAudio`. Builds in CI, not run on Windows yet
+- [x] Windows: system audio from Chromium's picker with `restrictOwnAudio` (tested). No per-app exclusion, so Discord can't be left out there
 - [x] ~~Publish through the LiveKit Rust SDK~~ not needed: the app publishes through the same web code, so the 1080p60 cap and bitrate tiers are shared
 - [x] Webview `getDisplayMedia` is enough for video on both OSes (Chromium)
-- [ ] Signed auto-update via Tauri updater, CI builds + GitHub Releases on this public repo (Linux: AppImage)
-- [ ] Deploy the web changes (`lib/desktop.ts`, share audio path) to prod, then test the app against prod
+- [x] Signed auto-update via Tauri updater, CI builds + GitHub Releases on this public repo (Linux: AppImage)
+- [x] Deploy the web changes (`lib/desktop.ts`, share audio path) to prod, then test the app against prod
