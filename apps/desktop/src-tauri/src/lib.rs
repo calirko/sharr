@@ -15,7 +15,7 @@ mod update;
 #[cfg(not(any(target_os = "linux", windows)))]
 mod sysaudio {
     #[tauri::command]
-    pub fn system_audio_supported() -> bool {
+    pub fn system_audio_available() -> bool {
         false
     }
 
@@ -107,7 +107,7 @@ pub fn run() {
             update::update_install,
             login::browser_login,
             sharebar::hide_share_bar,
-            sysaudio::system_audio_supported,
+            sysaudio::system_audio_available,
             sysaudio::system_audio_start,
             sysaudio::system_audio_stop,
             sysaudio::system_audio_include_discord,
@@ -137,7 +137,7 @@ pub fn run() {
                     .permission("allow-update-install")
                     .permission("allow-browser-login")
                     .permission("allow-hide-share-bar")
-                    .permission("allow-system-audio-supported")
+                    .permission("allow-system-audio-available")
                     .permission("allow-system-audio-start")
                     .permission("allow-system-audio-stop")
                     .permission("allow-system-audio-include-discord")

@@ -36,7 +36,7 @@ static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
-pub fn system_audio_supported() -> bool {
+pub fn system_audio_available() -> bool {
     true
 }
 

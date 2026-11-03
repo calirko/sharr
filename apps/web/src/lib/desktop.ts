@@ -27,7 +27,7 @@ export let hasNativeSystemAudio = isDesktop && isLinux;
 
 export const nativeAudioReady: Promise<void> =
   isDesktop && !isLinux
-    ? tauri!.core.invoke<boolean>("system_audio_supported").then(
+    ? tauri!.core.invoke<boolean>("system_audio_available").then(
         (v) => void (hasNativeSystemAudio = v),
         () => {},
       )

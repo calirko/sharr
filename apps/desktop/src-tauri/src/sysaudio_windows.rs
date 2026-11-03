@@ -7,7 +7,7 @@
 // left out. The mix goes to the page over a channel as 48 kHz stereo s16, where an AudioWorklet
 // turns it into a track (see apps/web/public/sysaudio-worklet.js).
 //
-// Without process loopback the page falls back to the picker's audio (system_audio_supported).
+// Without process loopback the page falls back to the picker's audio (system_audio_available).
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{mpsc, Mutex, OnceLock};
@@ -61,9 +61,10 @@ struct Running {
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 static SUPPORTED: OnceLock<bool> = OnceLock::new();
 
-/// Whether this Windows has process loopback. Tried once per launch.
+/// Whether this Windows has process loopback. Tried once per launch. Named apart from
+/// 0.1.9/0.1.10's system_audio_supported, whose probe crashed, so the page never calls that one.
 #[tauri::command]
-pub async fn system_audio_supported() -> bool {
+pub async fn system_audio_available() -> bool {
     *SUPPORTED.get_or_init(|| {
         if cfg!(debug_assertions) && std::env::var_os("SHARR_NO_LOOPBACK").is_some() {
             return false;
@@ -71,7 +72,12 @@ pub async fn system_audio_supported() -> bool {
         // COM on a thread of our own, the command runs on a shared one
         let ok = std::thread::spawn(|| {
             let _com = Com::init();
-            Source::open(unsafe { GetCurrentProcessId() }).is_ok()
+            // Released before CoUninitialize. As a tail expression the client outlived _com,
+            // which crashed 0.1.9 and 0.1.10.
+            let source = Source::open(unsafe { GetCurrentProcessId() });
+            let ok = source.is_ok();
+            drop(source);
+            ok
         })
         .join()
         .unwrap_or(false);
