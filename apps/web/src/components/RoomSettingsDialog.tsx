@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { api, type Room, type ShareMode } from "@/lib/api";
 import { getIncludeDiscord, hasNativeSystemAudio, setIncludeDiscord } from "@/lib/desktop";
 import { errorText } from "@/lib/errors";
+import { setOwnPreview, useOwnPreview } from "@/lib/preview";
 import { getSoundPrefs, setSoundPrefs, type SoundPrefs } from "@/lib/sounds";
 import { toast } from "sonner";
 
@@ -24,6 +25,7 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
   const [sounds, setSounds] = useState<SoundPrefs>(getSoundPrefs);
   const [includeDiscord, setDiscord] = useState(getIncludeDiscord);
   const [confirmClose, setConfirmClose] = useState(false);
+  const showOwn = useOwnPreview();
 
   function setSound(key: keyof SoundPrefs, on: boolean) {
     const next = { ...sounds, [key]: on };
@@ -74,6 +76,14 @@ export function RoomSettingsDialog({ open, onOpenChange, room, isCreator, onRoom
           <div className="flex items-center justify-between gap-4">
             <Label htmlFor="sound-presence">Someone joins or leaves</Label>
             <Switch id="sound-presence" checked={sounds.presence} onCheckedChange={(v) => setSound("presence", v)} />
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-3 border-t pt-4">
+          <h3 className="text-muted-foreground text-xs font-bold">Your share</h3>
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="own-preview">Show preview of your share</Label>
+            <Switch id="own-preview" checked={showOwn} onCheckedChange={setOwnPreview} />
           </div>
         </section>
 

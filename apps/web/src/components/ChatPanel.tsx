@@ -7,8 +7,8 @@ import { toast } from "sonner";
 
 const GROUP_MS = 5 * 60_000;
 
-export function ChatPanel() {
-  const { messages, send, nameOf, avatarOf } = useRoomChat();
+export function ChatPanel({ roomName }: { roomName: string }) {
+  const { messages, send, nameOf, avatarOf } = useRoomChat(roomName);
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);

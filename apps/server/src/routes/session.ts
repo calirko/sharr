@@ -10,6 +10,7 @@ import {
   destroySession,
   dropSession,
   publicUser,
+  requireDiscord,
   requireSession,
   setNickname,
   type SessionEnv,
@@ -40,9 +41,8 @@ export const sessionRoutes = new Hono<SessionEnv>()
     const session = c.get("session");
     return c.json({ user: session ? publicUser(session) : null, discord_enabled: discordEnabled });
   })
-  .post("/desktop-code", requireSession, limitByUser("desktop_code", 20, 600), async (c) => {
+  .post("/desktop-code", requireDiscord, limitByUser("desktop_code", 20, 600), async (c) => {
     const session = c.get("session")!;
-    if (session.kind !== "discord") return c.json({ error: "discord_only" }, 403);
     const code = randomId(24);
     await redis.send("SET", [handoffKey(code), session.user_id, "EX", String(HANDOFF_TTL)]);
     return c.json({ code });
@@ -54,7 +54,7 @@ export const sessionRoutes = new Hono<SessionEnv>()
     if (!user) return c.json({ error: "bad_code" }, 400);
     const old = c.get("session");
     if (old) await dropSession(old);
-    return c.json({ user: publicUser(await createDiscordSession(c, user)) });
+    return c.json({ user: publicUser(await createDiscordSession(c, user, "desktop")) });
   })
   .delete("/", async (c) => {
     const session = c.get("session");

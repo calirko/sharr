@@ -27,7 +27,7 @@ Testing happens on the prod domain (`https://sharr.calirko.com`) from the first 
 ## M3 — Web app (`apps/web`), tested on prod
 - [x] Vite + React + Tailwind + shadcn, served by the `sharr` container
 - [x] Nickname entry, room list/create/join (PIN prompt)
-- [x] Room view: share screen (1080p60 cap, quality/bitrate tier picker, audio on), watch streams, several sharers
+- [x] Room view: share screen (1440p60 cap, quality tiers with resolution + bitrate, Auto by default, audio on), watch streams, several sharers
 - [x] Room settings dialog (creator only)
 - [x] Chat over LiveKit data channels
 - [x] Responsive layout (mobile viewing, desktop sharing)
@@ -63,7 +63,15 @@ Main reason it exists: share system audio on Linux, which no browser can do (`ge
 - [x] Linux video: Chromium's `getDisplayMedia` (portal + PipeWire). Still needs a real share through the Hyprland portal picker
 - [x] Linux system audio: virtual PipeWire source fed by every app except sharr itself, captured by the page and published as the share's audio (tested locally: links, exclusion, cleanup, a viewer receives stereo 48 kHz)
 - [x] Windows: system audio from Chromium's picker with `restrictOwnAudio` (tested). No per-app exclusion, so Discord can't be left out there
-- [x] ~~Publish through the LiveKit Rust SDK~~ not needed: the app publishes through the same web code, so the 1080p60 cap and bitrate tiers are shared
+- [x] ~~Publish through the LiveKit Rust SDK~~ not needed: the app publishes through the same web code, so the 1440p60 cap and quality tiers are shared
 - [x] Webview `getDisplayMedia` is enough for video on both OSes (Chromium)
 - [x] Signed auto-update via Tauri updater, CI builds + GitHub Releases on this public repo (Linux: AppImage)
 - [x] Deploy the web changes (`lib/desktop.ts`, share audio path) to prod, then test the app against prod
+
+## M8 — Settings, notifications, account
+Discord users only. Guests don't see Settings.
+- [x] Settings dialog in the user menu (Account, Notifications, Sessions), user menu also in the room header
+- [x] Notifications for chat messages and joins/leaves while the window isn't focused, shown by the page through `sw.js` (no push server). Per device, off by default
+- [x] Session list with log out per session and "log out other sessions" (`/api/account/sessions`)
+- [x] Delete account: sessions, user record, own rooms, chat backlog entries
+- [ ] Test on prod in Chrome and Firefox, and in the desktop app (Linux + Windows): does CEF show web notifications, does a click focus the window? If not, add a `notify` command with `tauri-plugin-notification`

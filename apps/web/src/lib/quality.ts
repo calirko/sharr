@@ -1,25 +1,32 @@
-// Everything is capped at 1080p60. Tiers only change the bitrate, fps is picked separately.
-export const MAX_WIDTH = 1920;
-export const MAX_HEIGHT = 1080;
+// Capped at 1440p60. Each tier sets the capture height and the bitrate, fps is picked separately.
 export const MAX_FPS = 60;
 
 export const qualityTiers = [
-  { id: "low", label: "Low", bitrate: 2_500_000 },
-  { id: "standard", label: "Standard", bitrate: 5_000_000 },
-  { id: "high", label: "High", bitrate: 8_000_000 },
-  { id: "max", label: "Max", bitrate: 12_000_000 },
+  { id: "lowest", label: "Lowest", height: 480, bitrate: 1_500_000 },
+  { id: "low", label: "Low", height: 720, bitrate: 3_000_000 },
+  { id: "standard", label: "Standard", height: 1080, bitrate: 6_000_000 },
+  { id: "high", label: "High", height: 1080, bitrate: 10_000_000 },
+  { id: "max", label: "Max", height: 1440, bitrate: 16_000_000 },
 ] as const;
 
-export type QualityId = (typeof qualityTiers)[number]["id"];
+export type QualityTier = (typeof qualityTiers)[number];
+export type TierId = QualityTier["id"];
+// Auto moves between the tiers based on the sharer's connection and encoder load
+export type QualityId = TierId | "auto";
 
-const STORAGE_KEY = "sharr.quality";
+export const AUTO_START: TierId = "standard";
+
+export const tierIndex = (id: TierId) => qualityTiers.findIndex((t) => t.id === id);
+
+// New key so the old saved default ("standard") doesn't hide Auto
+const STORAGE_KEY = "sharr.share_quality";
 
 export function loadQuality(): QualityId {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (qualityTiers.some((t) => t.id === v)) return v as QualityId;
+    if (v === "auto" || qualityTiers.some((t) => t.id === v)) return v as QualityId;
   } catch {}
-  return "standard";
+  return "auto";
 }
 
 export function saveQuality(id: QualityId) {

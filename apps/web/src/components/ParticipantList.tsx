@@ -26,7 +26,7 @@ export function ParticipantList({ roomId, creatorId, canKick }: { roomId: string
               {p.attributes.discord_username && (
                 <span
                   title={`Discord: ${p.attributes.discord_username}`}
-                  className="bg-background absolute -right-1 -bottom-1 flex rounded-full p-px text-[#5865F2]"
+                  className="bg-background absolute -right-1 -bottom-1 flex rounded-xs p-px text-[#5865F2]"
                 >
                   <DiscordIcon className="size-2.5" />
                 </span>

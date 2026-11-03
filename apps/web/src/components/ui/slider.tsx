@@ -37,7 +37,7 @@ function Slider({
       <SliderPrimitive.Track
         data-slot="slider-track"
         className={cn(
-          "relative grow overflow-hidden rounded-full bg-primary/20 data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
+          "relative grow overflow-hidden rounded-xs bg-primary/20 data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
         )}
       >
         <SliderPrimitive.Range
@@ -53,7 +53,7 @@ function Slider({
           key={index}
           // Radix gives the thumb the slider role, so the label belongs there
           aria-label={ariaLabel}
-          className="block size-3.5 shrink-0 rounded-full bg-primary ring-primary/25 transition-[box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+          className="block size-3.5 shrink-0 rounded-[4px] bg-primary ring-primary/25 transition-[box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
         />
       ))}
     </SliderPrimitive.Root>

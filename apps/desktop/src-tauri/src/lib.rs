@@ -2,6 +2,7 @@
 mod idlefix;
 #[cfg(target_os = "linux")]
 mod sysaudio;
+mod link;
 mod login;
 mod single;
 mod update;
@@ -74,7 +75,8 @@ fn cef() -> tauri_runtime_cef::Cef {
 pub fn run() {
     // CEF runs its helper processes from this binary too
     let helper = std::env::args().any(|a| a.starts_with("--type="));
-    if !helper && !single::acquire() {
+    let link = if helper { None } else { link::from_args() };
+    if !helper && !single::acquire(link.as_deref()) {
         return;
     }
     #[cfg(target_os = "linux")]
@@ -100,6 +102,8 @@ pub fn run() {
         // Don't touch the webview in here: this runs on the main thread and webview getters wait on it.
         .on_permission_request(|_, kind| match kind {
             PermissionKind::Microphone if sysaudio::is_running() => PermissionResponse::Allow,
+            // Chat and join notifications, opt in from the settings dialog
+            PermissionKind::Notifications => PermissionResponse::Allow,
             _ => PermissionResponse::Default,
         })
         .setup(move |app| {
@@ -124,10 +128,15 @@ pub fn run() {
             )?;
 
             update::spawn_check(app.handle().clone());
+            // Debug builds would take the links away from the installed app
+            if !cfg!(debug_assertions) {
+                link::register();
+            }
 
             let handle = app.handle().clone();
             let app_origin = url.clone();
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.clone()))
+            let start = link::target(&url, link.as_deref());
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(start))
                 .title("sharr")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(360.0, 480.0)

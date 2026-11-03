@@ -9,7 +9,7 @@ export function UserAvatar({ name, url, className }: { name: string; url?: strin
   return (
     <span
       className={cn(
-        "bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold select-none",
+        "bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md text-xs font-bold select-none",
         className,
       )}
     >

@@ -12,6 +12,7 @@ const messages: Record<string, string> = {
   not_logged_in: "Your session expired. Reload the page.",
   bad_code: "That login expired. Try again.",
   discord_only: "Log in with Discord first.",
+  current_session: "Use Log out to end this session.",
 };
 
 export function errorText(err: unknown) {

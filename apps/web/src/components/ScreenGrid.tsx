@@ -1,6 +1,6 @@
 import { AudioTrack, useTracks, VideoTrack, type TrackReference } from "@livekit/components-react";
 import { RemoteTrackPublication, Track, VideoQuality } from "livekit-client";
-import { Maximize, MonitorUp, Play, Settings, Volume1, Volume2, VolumeX } from "lucide-react";
+import { Eye, EyeOff, Maximize, MonitorUp, Play, Settings, Volume1, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CenterStack } from "@/components/Layout";
 import { ParticipantAvatar } from "@/components/UserAvatar";
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Slider } from "@/components/ui/slider";
+import { setOwnPreview, useOwnPreview } from "@/lib/preview";
 import { cn } from "@/lib/utils";
 
 type Volume = { level: number; muted: boolean };
@@ -106,6 +107,9 @@ type TileProps = {
 function Tile({ trackRef, className, onClick, volume, onVolume, quality, onQuality }: TileProps) {
   const ref = useRef<HTMLDivElement>(null);
   const local = trackRef.participant.isLocal;
+  const showOwn = useOwnPreview();
+  // Your own share stays in the grid, but without the video when the preview is off
+  const hidden = local && !showOwn;
   const paused = useVideoPaused(ref);
   const [menuOpen, setMenuOpen] = useState(false);
   // Touch screens have no hover: a tap toggles the controls, and they hide again after a while
@@ -151,8 +155,15 @@ function Tile({ trackRef, className, onClick, volume, onVolume, quality, onQuali
       onClick={click}
       onPointerDownCapture={(e) => e.pointerType !== "mouse" && touchedAt && setTouchedAt(Date.now())}
     >
-      <VideoTrack trackRef={trackRef} className="size-full object-contain" />
-      {paused && (
+      {hidden ? (
+        <div className="flex size-full flex-col items-center justify-center gap-2 text-sm text-white/60">
+          <EyeOff className="size-6" />
+          Preview hidden
+        </div>
+      ) : (
+        <VideoTrack trackRef={trackRef} className="size-full object-contain" />
+      )}
+      {paused && !hidden && (
         <button
           className="absolute inset-0 flex items-center justify-center bg-black/40 text-white"
           title="Play"
@@ -200,6 +211,20 @@ function Tile({ trackRef, className, onClick, volume, onVolume, quality, onQuali
               />
             </div>
           </div>
+        )}
+        {local && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title={hidden ? "Show preview" : "Hide preview"}
+            className="rounded-lg bg-black/60 text-white hover:bg-white/20 hover:text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOwnPreview(hidden);
+            }}
+          >
+            {hidden ? <Eye /> : <EyeOff />}
+          </Button>
         )}
         {!local && (
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>

@@ -122,4 +122,7 @@ jobs:
             '{version: $v, pub_date: $date, platforms: {
               "linux-x86_64": {signature: $lsig, url: $lurl},
               "windows-x86_64": {signature: $wsig, url: $wurl}}}' > dist/latest.json
+          # Unversioned copies, for the web app's download links (releases/latest/download/...)
+          cp "dist/$appimage" dist/sharr_amd64.AppImage
+          cp "dist/$setup" dist/sharr_x64-setup.exe
           gh release create "$TAG" --title "sharr desktop $version" --notes "Desktop app $version" dist/*

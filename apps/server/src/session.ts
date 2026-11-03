@@ -10,9 +10,15 @@ export type Session = {
   kind: "guest" | "discord";
   nickname: string;
   created_at: string;
+  // Shown in the session list, set at login
+  user_agent?: string;
+  client?: Client;
+  last_seen?: string;
   // Discord sessions only, loaded from the user record on every request
   user?: User;
 };
+
+export type Client = "web" | "desktop";
 
 export type SessionEnv = { Variables: { session: Session | null } };
 
@@ -24,6 +30,8 @@ const GUEST_TTL = 60 * 60 * 24;
 const ttlFor = (kind: Session["kind"]) => (kind === "discord" ? DISCORD_TTL : GUEST_TTL);
 // Activity keeps a session alive, but never past this, so a stolen cookie stops working eventually
 const MAX_AGE_MS = { guest: 7 * 24 * 3600 * 1000, discord: 90 * 24 * 3600 * 1000 };
+// last_seen is only rewritten when older than this, so most requests don't write
+const SEEN_EVERY_MS = 5 * 60 * 1000;
 // Each login makes a new session. Past this many, the oldest are logged out.
 const MAX_DISCORD_SESSIONS = 10;
 
@@ -62,6 +70,10 @@ async function loadSession(sid: string): Promise<Session | null> {
     session.nickname = user.nickname;
   }
   await redis.expire(key(sid), ttlFor(kind));
+  if (!(Date.now() - Number(session.last_seen) < SEEN_EVERY_MS)) {
+    session.last_seen = String(Date.now());
+    await redis.hset(key(sid), { last_seen: session.last_seen });
+  }
   return session;
 }
 
@@ -83,6 +95,13 @@ export const requireSession: MiddlewareHandler<SessionEnv> = async (c, next) => 
   await next();
 };
 
+export const requireDiscord: MiddlewareHandler<SessionEnv> = async (c, next) => {
+  const session = c.get("session");
+  if (!session) return c.json({ error: "not_logged_in" }, 401);
+  if (session.kind !== "discord") return c.json({ error: "discord_only" }, 403);
+  await next();
+};
+
 // Checked on every request. The flag is read fresh from the user record.
 export const requireAdmin: MiddlewareHandler<SessionEnv> = async (c, next) => {
   const session = c.get("session");
@@ -91,8 +110,19 @@ export const requireAdmin: MiddlewareHandler<SessionEnv> = async (c, next) => {
   await next();
 };
 
-async function createSession(c: Context, fields: Omit<Session, "sid" | "created_at">): Promise<Session> {
-  const session: Session = { sid: randomId(24), ...fields, created_at: String(Date.now()) };
+async function createSession(
+  c: Context,
+  fields: Omit<Session, "sid" | "created_at" | "user_agent" | "last_seen">,
+): Promise<Session> {
+  const now = String(Date.now());
+  const session: Session = {
+    sid: randomId(24),
+    ...fields,
+    client: fields.client ?? "web",
+    user_agent: (c.req.header("user-agent") ?? "").replace(/[\x00-\x1f\x7f]/g, "").slice(0, 300),
+    created_at: now,
+    last_seen: now,
+  };
   const { sid, user, ...data } = session;
   // Discord nicknames live on the user record
   await redis.hset(key(sid), user ? { ...data, nickname: "" } : data);
@@ -112,8 +142,8 @@ export function createGuestSession(c: Context, nickname: string) {
   return createSession(c, { user_id: `g_${randomId(9)}`, kind: "guest", nickname });
 }
 
-export function createDiscordSession(c: Context, user: User) {
-  return createSession(c, { user_id: user.user_id, kind: "discord", nickname: user.nickname, user });
+export function createDiscordSession(c: Context, user: User, client: Client = "web") {
+  return createSession(c, { user_id: user.user_id, kind: "discord", nickname: user.nickname, user, client });
 }
 
 export async function setNickname(session: Session, nickname: string) {
@@ -135,6 +165,37 @@ export async function destroySession(c: Context, session: Session) {
 export async function dropSession(session: Pick<Session, "sid" | "user_id" | "kind">) {
   await redis.del(key(session.sid));
   if (session.kind === "discord") await redis.send("ZREM", [userSessionsKey(session.user_id), session.sid]);
+}
+
+// A Discord user's live sessions, newest first. Expired ones are pruned from the list.
+export async function listUserSessions(userId: string): Promise<Session[]> {
+  const list = userSessionsKey(userId);
+  const sids = (await redis.send("ZRANGE", [list, "0", "-1", "REV"])) as string[];
+  const sessions: Session[] = [];
+  const gone: string[] = [];
+  for (const sid of sids) {
+    const data = await redis.hgetall(key(sid));
+    if (data.user_id === userId) sessions.push({ sid, ...data } as Session);
+    else gone.push(sid);
+  }
+  if (gone.length) await redis.send("ZREM", [list, ...gone]);
+  return sessions;
+}
+
+// Only drops sids that belong to the user
+export async function dropUserSession(userId: string, sid: string) {
+  const owned = await redis.send("ZSCORE", [userSessionsKey(userId), sid]);
+  if (owned === null) return false;
+  await dropSession({ sid, user_id: userId, kind: "discord" });
+  return true;
+}
+
+export async function dropAllUserSessions(userId: string, keep?: string) {
+  const list = userSessionsKey(userId);
+  const sids = ((await redis.send("ZRANGE", [list, "0", "-1"])) as string[]).filter((s) => s !== keep);
+  if (!sids.length) return;
+  await redis.del(...sids.map(key));
+  await redis.send("ZREM", [list, ...sids]);
 }
 
 export function publicUser(session: Session) {

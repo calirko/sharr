@@ -7,11 +7,11 @@ export function TopBar({ children }: { children: ReactNode }) {
   return <header className="flex h-13 shrink-0 items-center gap-2 border-b px-3">{children}</header>;
 }
 
-export function IconCircle({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {
+export function IconTile({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {
   return (
     <div
       className={cn(
-        "bg-foreground/5 text-muted-foreground flex size-14 shrink-0 items-center justify-center rounded-full [&_svg]:size-[43%]",
+        "bg-foreground/5 text-muted-foreground flex size-14 shrink-0 items-center justify-center rounded-xl [&_svg]:size-[43%]",
         className,
       )}
     >
@@ -34,7 +34,7 @@ export function CenterStack({
 }) {
   return (
     <div className={cn("flex flex-col items-center gap-4 text-center", className)}>
-      <IconCircle icon={icon} />
+      <IconTile icon={icon} />
       <p className="text-muted-foreground text-sm">{text}</p>
       {children}
     </div>

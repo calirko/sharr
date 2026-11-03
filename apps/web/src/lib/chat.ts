@@ -1,6 +1,7 @@
 import { useParticipants, useRoomContext } from "@livekit/components-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { notify } from "./notify";
 import { playSound } from "./sounds";
 import { useUser } from "./user";
 
@@ -56,7 +57,7 @@ async function readLimited(reader: AsyncIterable<string>) {
 
 // Messages can arrive before LiveKit tells us the sender joined, so keep the identity
 // and look the name up on render. Names of people who left are kept for old messages.
-export function useRoomChat() {
+export function useRoomChat(roomName: string) {
   const room = useRoomContext();
   const participants = useParticipants();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -66,6 +67,9 @@ export function useRoomChat() {
   }
 
   const { user } = useUser();
+  // Read from the handler without re-registering it
+  const latest = useRef({ roomName, userKind: user?.kind });
+  latest.current = { roomName, userKind: user?.kind };
   const sendLimit = useRef(createLimiter(RATE_MAX, RATE_WINDOW_MS));
 
   const append = useCallback((msg: ChatMessage) => {
@@ -91,6 +95,15 @@ export function useRoomChat() {
       if (!text) return;
       append({ kind: "message", id: localId(), identity, text, timestamp });
       playSound("message");
+      const sender = people.current.get(identity);
+      const name = sender?.name ?? room.remoteParticipants.get(identity)?.name ?? "Someone";
+      notify("messages", latest.current.userKind, {
+        title: `${name} in ${latest.current.roomName}`,
+        body: text,
+        tag: `chat:${room.name}`,
+        url: `/r/${room.name}`,
+        icon: sender?.avatar,
+      });
     });
     return () => room.unregisterTextStreamHandler(TOPIC);
   }, [room, append]);

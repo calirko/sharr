@@ -1,6 +1,6 @@
 import { useLocalParticipant } from "@livekit/components-react";
-import { ArrowLeftRight, Check, MonitorOff, MonitorUp, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeftRight, Check, LoaderCircle, MonitorOff, MonitorUp, SlidersHorizontal } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -13,11 +13,12 @@ import {
   loadQuality,
   qualityTiers,
   saveFps,
+  type QualityTier,
   saveQuality,
   type Fps,
   type QualityId,
 } from "@/lib/quality";
-import { startShare, stopShare, switchShare, updateShare } from "@/lib/share";
+import { getAutoTier, startShare, stopShare, subscribeAutoTier, switchShare, updateShare } from "@/lib/share";
 import { toast } from "sonner";
 
 // `large` is the call to action in the empty room, with the label always shown
@@ -27,6 +28,8 @@ export function ShareButton({ large }: { large?: boolean }) {
   const [quality, setQuality] = useState<QualityId>(loadQuality);
   const [fps, setFps] = useState<Fps>(loadFps);
   const [busy, setBusy] = useState(false);
+  const autoTier = useSyncExternalStore(subscribeAutoTier, getAutoTier);
+  const autoNow = qualityTiers.find((t) => t.id === autoTier);
 
   // Phones can watch but not share
   if (!canCaptureScreen()) return null;
@@ -62,15 +65,17 @@ export function ShareButton({ large }: { large?: boolean }) {
     <>
       {isScreenShareEnabled ? (
         <>
-          <Button variant="outline" size="sm" title="Share something else" disabled={busy} onClick={switchCapture}>
-            <ArrowLeftRight /> <span className="hidden sm:inline">Switch</span>
-          </Button>
-          <Button variant="ghost" size="icon" title="Share quality" onClick={() => setOpen(true)}>
+          <Button variant="ghost" size="icon-sm" title="Share quality" onClick={() => setOpen(true)}>
             <SlidersHorizontal />
           </Button>
-          <Button variant="destructive" size="sm" onClick={() => stopShare(localParticipant)}>
-            <MonitorOff /> <span className="hidden sm:inline">Stop</span>
-          </Button>
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="sm" title="Share something else" disabled={busy} onClick={switchCapture}>
+              <ArrowLeftRight /> <span className="hidden sm:inline">Switch</span>
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => stopShare(localParticipant)}>
+              <MonitorOff /> <span className="hidden sm:inline">Stop</span>
+            </Button>
+          </div>
         </>
       ) : (
         <Button size={large ? "lg" : "sm"} onClick={() => setOpen(true)}>
@@ -84,7 +89,7 @@ export function ShareButton({ large }: { large?: boolean }) {
             <DialogDescription>
               {isScreenShareEnabled
                 ? "Applies right away, no need to stop sharing."
-                : "Up to 1080p. Tab or system audio is shared if you allow it."}
+                : "Up to 1440p. Tab or system audio is shared if you allow it."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2">
@@ -94,9 +99,12 @@ export function ShareButton({ large }: { large?: boolean }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="auto">
+                  Auto {autoNow && isScreenShareEnabled ? `(now ${tierText(autoNow)})` : "(adjusts to your connection)"}
+                </SelectItem>
                 {qualityTiers.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.label} ({t.bitrate / 1_000_000} Mbps)
+                    {t.label} ({tierText(t)})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -123,6 +131,11 @@ export function ShareButton({ large }: { large?: boolean }) {
                 <>
                   <Check /> Apply
                 </>
+              ) : busy ? (
+                // The browser's share prompt can sit unanswered, e.g. until the window gets focus
+                <>
+                  <LoaderCircle className="animate-spin" /> Waiting for the browser…
+                </>
               ) : (
                 <>
                   <MonitorUp /> Start sharing
@@ -135,3 +148,5 @@ export function ShareButton({ large }: { large?: boolean }) {
     </>
   );
 }
+
+const tierText = (t: QualityTier) => `${t.height}p, ${t.bitrate / 1_000_000} Mbps`;

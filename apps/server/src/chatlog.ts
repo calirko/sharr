@@ -3,7 +3,7 @@ import { redis } from "./redis";
 // Backlog of messages from Discord users, for debugging and usage history.
 // Guests are never stored. Clients report their own messages, since chat
 // never passes through this server.
-const STREAM = "chat";
+export const STREAM = "chat";
 const KEEP = 100_000;
 export const MAX_LENGTH = 1000;
 const RATE_MAX = 5;

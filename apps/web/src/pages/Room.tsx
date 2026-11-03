@@ -1,4 +1,4 @@
-import { LiveKitRoom } from "@livekit/components-react";
+import { LiveKitRoom, setLogLevel } from "@livekit/components-react";
 import { DisconnectReason } from "livekit-client";
 import { ArrowLeft, LogIn, RotateCw, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { api, ApiError, type JoinInfo, type Room } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { toast } from "sonner";
+
+// LiveKit logs through its own logger, which dropConsole can't strip
+if (import.meta.env.PROD) setLogLevel("silent");
 
 type State =
   | { kind: "loading" }
@@ -86,7 +89,6 @@ export function RoomPage({ id }: { id: string }) {
   // Must be stable: LiveKitRoom calls connect() again whenever onError changes,
   // and that breaks a room that is mid-reconnect (common after a tab switch)
   const onError = useCallback((err: Error) => {
-    console.error("livekit error", err);
     setState({ kind: "ended", text: `Could not connect to the media server (${err.message}).`, rejoin: true });
   }, []);
 

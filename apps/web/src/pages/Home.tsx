@@ -1,12 +1,14 @@
 import { Logo } from "@/components/Logo";
-import { DoorOpen, Lock, Plus, Trash2, Users } from "lucide-react";
+import { DoorOpen, Link2, Lock, Plus, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { CenterStack, TopBar } from "@/components/Layout";
 import { CreateRoomDialog } from "@/components/CreateRoomDialog";
-import { RenameDialog } from "@/components/RenameDialog";
+import { DownloadPrompt } from "@/components/DownloadPrompt";
+import { RepoLink } from "@/components/GitHubIcon";
+import { JoinLinkDialog } from "@/components/JoinLinkDialog";
 import { UserMenu } from "@/components/UserMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,7 @@ const POLL_MS = 10_000;
 export function Home() {
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [creating, setCreating] = useState(false);
-  const [renaming, setRenaming] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [deleting, setDeleting] = useState<Room | null>(null);
 
   useEffect(() => {
@@ -37,7 +39,8 @@ export function Home() {
         <h1 className="min-w-0 flex-1">
           <Logo />
         </h1>
-        <UserMenu onRename={() => setRenaming(true)} />
+        <RepoLink />
+        <UserMenu />
       </TopBar>
 
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
@@ -76,12 +79,16 @@ export function Home() {
             <Button size="lg" onClick={() => setCreating(true)}>
               <Plus /> New room
             </Button>
+            <Button variant="ghost" onClick={() => setJoining(true)}>
+              <Link2 /> Join with link
+            </Button>
           </CenterStack>
         )}
       </main>
 
+      <DownloadPrompt />
       {creating && <CreateRoomDialog open onOpenChange={setCreating} />}
-      {renaming && <RenameDialog open onOpenChange={setRenaming} />}
+      {joining && <JoinLinkDialog open onOpenChange={setJoining} />}
       {deleting && (
         <ConfirmDialog
           open

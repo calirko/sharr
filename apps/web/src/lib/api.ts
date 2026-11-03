@@ -59,6 +59,15 @@ export class ApiError extends Error {
   }
 }
 
+export type SessionInfo = {
+  id: string;
+  client: "web" | "desktop";
+  user_agent: string;
+  created_at: number;
+  last_seen: number;
+  is_current: boolean;
+};
+
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
@@ -77,6 +86,10 @@ export const api = {
   logout: () => call<{ ok: true }>("DELETE", "/session"),
   desktopCode: () => call<{ code: string }>("POST", "/session/desktop-code"),
   desktopRedeem: (code: string) => call<{ user: User }>("POST", "/session/desktop-redeem", { code }),
+  sessions: () => call<{ sessions: SessionInfo[] }>("GET", "/account/sessions"),
+  revokeSession: (id: string) => call<{ ok: true }>("DELETE", `/account/sessions/${encodeURIComponent(id)}`),
+  revokeOtherSessions: () => call<{ ok: true }>("DELETE", "/account/sessions"),
+  deleteAccount: () => call<{ ok: true }>("DELETE", "/account"),
   rooms: () => call<{ rooms: Room[] }>("GET", "/rooms"),
   room: (id: string) => call<{ room: Room }>("GET", `/rooms/${id}`),
   createRoom: (body: { name: string; pin?: string; share_mode: ShareMode }) =>
