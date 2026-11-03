@@ -55,6 +55,10 @@ fn cef() -> tauri_runtime_cef::Cef {
         .persist_session_cookies(true)
         // The window only shows our own pages, and room audio should play without a click first
         .autoplay(tauri_runtime_cef::AutoplayPolicy::NoUserGestureRequired);
+    // Chromium encodes WebRTC video in software on Linux unless VA-API encoding is turned on.
+    // Windows uses Media Foundation's hardware H.264 encoder by default.
+    #[cfg(target_os = "linux")]
+    let cef = cef.enable_features(["AcceleratedVideoEncoder", "VaapiVideoEncoder", "VaapiOnNvidiaGPUs"]);
     // With a locked keyring Chromium shows nothing but an unlock prompt until it gets the key.
     // Skip the keyring: the cookie store is then only protected by file permissions, as in most
     // Electron apps. Windows is unaffected and keeps DPAPI.
