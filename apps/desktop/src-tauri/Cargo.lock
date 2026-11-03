@@ -2471,6 +2471,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "jpeg-encoder"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0370574b86f7eca156b9f298392b5e69a23f8c86f3f865add60bbc2e79467a6"
+
+[[package]]
 name = "js-sys"
 version = "0.3.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4261,15 +4267,19 @@ dependencies = [
 
 [[package]]
 name = "sharr"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
+ "base64 0.22.1",
  "env_logger",
  "getrandom 0.3.4",
  "glib-sys",
  "interprocess",
+ "jpeg-encoder",
  "libc",
  "log",
  "pipewire",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "tauri",
@@ -4823,8 +4833,6 @@ dependencies = [
 [[package]]
 name = "tauri-runtime-cef"
 version = "3.0.0-alpha.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fc02ef8f4295b0036b1d6cbe99111e263b587c870f0d54d9bc386602f10b947"
 dependencies = [
  "base64 0.22.1",
  "cef",

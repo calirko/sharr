@@ -68,9 +68,11 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setRenaming(true)}>
-            <Pencil /> Change nickname
-          </DropdownMenuItem>
+          {user.kind === "guest" && (
+            <DropdownMenuItem onSelect={() => setRenaming(true)}>
+              <Pencil /> Change nickname
+            </DropdownMenuItem>
+          )}
           {user.kind === "discord" && (
             <DropdownMenuItem onSelect={() => setSettings(true)}>
               <Settings /> Settings

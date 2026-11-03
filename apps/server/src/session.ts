@@ -2,7 +2,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { config } from "./config";
 import { randomId, redis } from "./redis";
-import { avatarUrl, getUser, isAdmin, setUserNickname, type User } from "./users";
+import { avatarUrl, getUser, isAdmin, type User } from "./users";
 
 export type Session = {
   sid: string;
@@ -146,13 +146,9 @@ export function createDiscordSession(c: Context, user: User, client: Client = "w
   return createSession(c, { user_id: user.user_id, kind: "discord", nickname: user.nickname, user, client });
 }
 
+// Guests only, Discord users go by their Discord name
 export async function setNickname(session: Session, nickname: string) {
-  if (session.user) {
-    await setUserNickname(session.user_id, nickname);
-    session.user.nickname = nickname;
-  } else {
-    await redis.hset(key(session.sid), { nickname });
-  }
+  await redis.hset(key(session.sid), { nickname });
   session.nickname = nickname;
 }
 

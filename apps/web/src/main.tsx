@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { SourcePicker } from "./components/SourcePicker";
 import { TitleBar } from "./components/TitleBar";
 import { Toaster } from "./components/ui/sonner";
-import { watchUpdates } from "./lib/desktop";
+import { disguiseBrowser, isDesktop, watchUpdates } from "./lib/desktop";
 import { registerServiceWorker } from "./lib/notify";
 import { initTheme } from "./lib/theme";
 import { UserProvider } from "./lib/user";
@@ -16,10 +17,12 @@ createRoot(document.getElementById("root")!).render(
     <UserProvider>
       <TitleBar />
       <App />
+      {isDesktop && <SourcePicker />}
       <Toaster />
     </UserProvider>
   </StrictMode>,
 );
 
 watchUpdates();
+disguiseBrowser();
 registerServiceWorker();

@@ -2,6 +2,7 @@
 // the app injects window.__TAURI__ for this origin only.
 import { toast } from "sonner";
 import { api } from "./api";
+import type { CaptureSource } from "./picker";
 
 type Channel = { onmessage: (data: ArrayBuffer) => void };
 
@@ -105,6 +106,72 @@ async function linuxAudioTrack() {
     },
   });
   return stream.getAudioTracks()[0];
+}
+
+// Our own source picker instead of Chromium's (Windows apps from 0.1.12). Only used with the
+// app's system audio, since the picked capture has no audio of its own.
+const pickerAvailable: Promise<boolean> = isDesktop
+  ? tauri!.core.invoke<boolean>("capture_picker_available").catch(() => false)
+  : Promise.resolve(false);
+
+export async function hasOwnPicker() {
+  await nativeAudioReady;
+  return hasNativeSystemAudio && (await pickerAvailable);
+}
+
+export const captureSources = () => tauri!.core.invoke<CaptureSource[]>("capture_sources");
+
+// The app grants desktop capture only for a moment after the pick (picker.rs)
+export async function captureSource(id: string, width: number, height: number, fps: number) {
+  await tauri!.core.invoke("capture_arm");
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: id,
+          maxWidth: width,
+          maxHeight: height,
+          maxFrameRate: fps,
+        },
+      },
+    } as unknown as MediaStreamConstraints);
+    return stream.getVideoTracks()[0];
+  } finally {
+    tauri!.core.invoke("capture_disarm").catch(() => {});
+  }
+}
+
+const editable = (t: EventTarget | null) =>
+  t instanceof Element && !!t.closest("input, textarea, [contenteditable]:not([contenteditable=false])");
+
+// Hides what gives the app away as Chromium: its context menu (kept in text fields for copy
+// and paste), Ctrl+wheel and pinch zoom, the find bar, middle-click autoscroll, link and
+// image dragging, and files dropped on the window, which Chromium would open.
+export function disguiseBrowser() {
+  if (!isDesktop) return;
+  const opts = { capture: true };
+  window.addEventListener("contextmenu", (e) => editable(e.target) || e.preventDefault(), opts);
+  window.addEventListener("wheel", (e) => e.ctrlKey && e.preventDefault(), { capture: true, passive: false });
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      const key = e.key.toLowerCase();
+      if (e.key === "F3" || ((e.ctrlKey || e.metaKey) && (key === "f" || key === "g"))) e.preventDefault();
+    },
+    opts,
+  );
+  // Text fields keep middle-click paste on Linux
+  window.addEventListener("mousedown", (e) => e.button === 1 && !editable(e.target) && e.preventDefault(), opts);
+  window.addEventListener("auxclick", (e) => e.button === 1 && e.preventDefault(), opts);
+  window.addEventListener(
+    "dragstart",
+    (e) => e.target instanceof Element && e.target.closest("a, img") && e.preventDefault(),
+    opts,
+  );
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
 }
 
 // Discord login runs in the system browser, which sends the app a one-time code (/desktop-login)

@@ -2,12 +2,22 @@ import {
   AudioPresets,
   LocalAudioTrack,
   LocalVideoTrack,
+  type LocalTrack,
   Track,
   type AudioCaptureOptions,
   type LocalParticipant,
 } from "livekit-client";
 import { toast } from "sonner";
-import { hasNativeSystemAudio, hideShareBar, nativeAudioReady, stopSystemAudio, systemAudioTrack } from "./desktop";
+import {
+  captureSource,
+  hasNativeSystemAudio,
+  hasOwnPicker,
+  hideShareBar,
+  nativeAudioReady,
+  stopSystemAudio,
+  systemAudioTrack,
+} from "./desktop";
+import { pickSource } from "./picker";
 import { AUTO_START, qualityTiers, tierIndex, type Fps, type QualityId, type QualityTier, type TierId } from "./quality";
 
 // One share per page at most, so the share's settings live here
@@ -50,7 +60,16 @@ function maxBitrate(quality: QualityId, tier: TierId) {
 
 // Voice processing is on by default and wrecks music and game audio.
 // restrictOwnAudio keeps the room's own playback out of system audio where Chrome supports it.
-async function captureTracks(lp: LocalParticipant, tier: QualityTier, fps: Fps) {
+async function captureTracks(lp: LocalParticipant, tier: QualityTier, fps: Fps): Promise<LocalTrack[]> {
+  if (await hasOwnPicker()) {
+    const source = await pickSource();
+    // Same as closing the browser's picker
+    if (!source) throw new DOMException("No source picked", "NotAllowedError");
+    const track = await captureSource(source.id, widthOf(tier), tier.height, fps);
+    track.contentHint = "motion";
+    hideShareBar();
+    return [new LocalVideoTrack(track, undefined, true)];
+  }
   await nativeAudioReady;
   const tracks = await lp.createScreenTracks({
     audio: hasNativeSystemAudio

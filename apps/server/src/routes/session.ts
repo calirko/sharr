@@ -34,6 +34,7 @@ export const sessionRoutes = new Hono<SessionEnv>()
   // Keeps user_id, so rooms the user created stay theirs
   .patch("/", requireSession, limitByUser("rename", 10, 60), zValidator("json", z.object({ nickname: nicknameSchema })), async (c) => {
     const session = c.get("session")!;
+    if (session.kind !== "guest") return c.json({ error: "not_guest" }, 403);
     await setNickname(session, c.req.valid("json").nickname);
     return c.json({ user: publicUser(session) });
   })

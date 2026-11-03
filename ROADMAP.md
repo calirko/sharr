@@ -68,6 +68,8 @@ Main reason it exists: share system audio on Linux, which no browser can do (`ge
 - [x] Webview `getDisplayMedia` is enough for video on both OSes (Chromium)
 - [x] Signed auto-update via Tauri updater, CI builds + GitHub Releases on this public repo (Linux: AppImage)
 - [x] Deploy the web changes (`lib/desktop.ts`, share audio path) to prod, then test the app against prod
+- [ ] Windows: own screen/window picker instead of Chromium's (0.1.12, vendored runtime patch). Test on Windows: right source captured, thumbnails, no sharing bar
+- [x] Hide Chromium's context menu, zoom, find bar, autoscroll, drag and file drops in the app
 
 ## M8 — Settings, notifications, account
 Discord users only. Guests don't see Settings.

@@ -20,10 +20,15 @@ export async function getUser(id: string): Promise<User | null> {
   return data.discord_id ? ({ user_id: id, ...data } as User) : null;
 }
 
-// Keeps the nickname they picked here, refreshes the rest from Discord
+// The nickname is the Discord display name, refreshed on every login
 export async function upsertDiscordUser(profile: { id: string; username: string; global_name: string | null; avatar: string | null }) {
   const id = `d_${profile.id}`;
-  const fields = { discord_id: profile.id, discord_username: profile.username, avatar: profile.avatar ?? "" };
+  const fields = {
+    discord_id: profile.id,
+    discord_username: profile.username,
+    avatar: profile.avatar ?? "",
+    nickname: cleanName(profile.global_name || profile.username).slice(0, 32) || "user",
+  };
   const existing = await getUser(id);
   if (existing) {
     await redis.hset(key(id), fields);
@@ -32,17 +37,12 @@ export async function upsertDiscordUser(profile: { id: string; username: string;
   const user: User = {
     user_id: id,
     ...fields,
-    nickname: cleanName(profile.global_name || profile.username).slice(0, 32) || "user",
     is_admin: "0",
     created_at: String(Date.now()),
   };
   const { user_id, ...data } = user;
   await redis.hset(key(user_id), data);
   return user;
-}
-
-export async function setUserNickname(id: string, nickname: string) {
-  await redis.hset(key(id), { nickname });
 }
 
 export function avatarUrl(user: Pick<User, "discord_id" | "avatar">) {

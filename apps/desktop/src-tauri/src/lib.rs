@@ -7,6 +7,8 @@ mod sysaudio;
 mod sysaudio;
 mod link;
 mod login;
+mod offline;
+mod picker;
 mod sharebar;
 mod single;
 mod update;
@@ -43,6 +45,7 @@ use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::{Manager, Url, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
+use tauri_runtime_cef::{FrameEventKind, WebviewWindowBuilderCefExt};
 
 const APP_URL: &str = "https://sharr.calirko.com";
 
@@ -58,14 +61,17 @@ fn app_url() -> Url {
 
 // Everything else, Discord login included, opens in the system browser (see login.rs)
 fn allowed_in_app(url: &Url, app: &Url) -> bool {
-    url.origin() == app.origin() || url.scheme() == "about"
+    url.origin() == app.origin() || url.origin() == offline::page().origin() || url.scheme() == "about"
 }
 
 fn cef() -> tauri_runtime_cef::Cef {
     let cef = tauri_runtime_cef::Cef::default()
         .persist_session_cookies(true)
         // The window only shows our own pages, and room audio should play without a click first
-        .autoplay(tauri_runtime_cef::AutoplayPolicy::NoUserGestureRequired);
+        .autoplay(tauri_runtime_cef::AutoplayPolicy::NoUserGestureRequired)
+        // Only our own pages load here, so no Safe Browsing list updates, and no print preview
+        .safe_browsing(false)
+        .profile_preference("printing.enabled", false);
     // Chromium encodes WebRTC video in software on Linux unless VA-API encoding is turned on.
     // Windows uses Media Foundation's hardware H.264 encoder by default.
     #[cfg(target_os = "linux")]
@@ -102,11 +108,17 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(update::Pending::default())
         .manage(login::AppUrl(url.clone()))
+        .manage(offline::Offline::default())
         .invoke_handler(tauri::generate_handler![
             update::update_pending,
             update::update_install,
             login::browser_login,
+            offline::offline_retry,
             sharebar::hide_share_bar,
+            picker::capture_picker_available,
+            picker::capture_sources,
+            picker::capture_arm,
+            picker::capture_disarm,
             sysaudio::system_audio_available,
             sysaudio::system_audio_start,
             sysaudio::system_audio_stop,
@@ -116,6 +128,8 @@ pub fn run() {
         // Don't touch the webview in here: this runs on the main thread and webview getters wait on it.
         .on_permission_request(|_, kind| match kind {
             PermissionKind::Microphone if sysaudio::is_running() => PermissionResponse::Allow,
+            // The source the user just picked in our picker (picker.rs)
+            PermissionKind::DisplayCapture if picker::armed() => PermissionResponse::Allow,
             // Chat and join notifications, opt in from the settings dialog
             PermissionKind::Notifications => PermissionResponse::Allow,
             _ => PermissionResponse::Default,
@@ -126,7 +140,7 @@ pub fn run() {
             if idlefix::destroy_chromium_work_source() == 0 {
                 log::warn!("Chromium's idle GLib source not found, the main thread may spin");
             }
-            // Only the app's own origin gets IPC
+            // Only the app's own origin gets IPC, plus our bundled pages (local, the default)
             let origin = url.origin().ascii_serialization();
             app.add_capability(
                 CapabilityBuilder::new("app")
@@ -136,7 +150,12 @@ pub fn run() {
                     .permission("allow-update-pending")
                     .permission("allow-update-install")
                     .permission("allow-browser-login")
+                    .permission("allow-offline-retry")
                     .permission("allow-hide-share-bar")
+                    .permission("allow-capture-picker-available")
+                    .permission("allow-capture-sources")
+                    .permission("allow-capture-arm")
+                    .permission("allow-capture-disarm")
                     .permission("allow-system-audio-available")
                     .permission("allow-system-audio-start")
                     .permission("allow-system-audio-stop")
@@ -172,6 +191,8 @@ pub fn run() {
             }
 
             let handle = app.handle().clone();
+            let failed = app.handle().clone();
+            let loaded = app.handle().clone();
             let app_origin = url.clone();
             let start = link::target(&url, link.as_deref());
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(start))
@@ -187,6 +208,17 @@ pub fn run() {
                     }
                     let _ = handle.opener().open_url(to.as_str(), None::<&str>);
                     false
+                })
+                // Chromium's error page and Cloudflare's 5xx pages give way to offline.html
+                .on_frame_event(move |e| {
+                    if let (true, FrameEventKind::NavigationFailed { url }) = (e.is_main, e.kind) {
+                        offline::check(&failed, url);
+                    }
+                })
+                .on_page_load(move |_, p| {
+                    if p.event() == tauri::webview::PageLoadEvent::Finished {
+                        offline::check(&loaded, p.url().clone());
+                    }
                 })
                 .build()?;
 
