@@ -1,5 +1,5 @@
 import { useLocalParticipant } from "@livekit/components-react";
-import { Check, MonitorOff, MonitorUp, SlidersHorizontal } from "lucide-react";
+import { ArrowLeftRight, Check, MonitorOff, MonitorUp, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,7 +17,7 @@ import {
   type Fps,
   type QualityId,
 } from "@/lib/quality";
-import { startShare, stopShare, updateShare } from "@/lib/share";
+import { startShare, stopShare, switchShare, updateShare } from "@/lib/share";
 import { toast } from "sonner";
 
 // `large` is the call to action in the empty room, with the label always shown
@@ -47,10 +47,24 @@ export function ShareButton({ large }: { large?: boolean }) {
     }
   }
 
+  async function switchCapture() {
+    setBusy(true);
+    try {
+      await switchShare(localParticipant, fps);
+    } catch (err) {
+      if (!(err instanceof Error && err.name === "NotAllowedError")) toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       {isScreenShareEnabled ? (
         <>
+          <Button variant="outline" size="sm" title="Share something else" disabled={busy} onClick={switchCapture}>
+            <ArrowLeftRight /> <span className="hidden sm:inline">Switch</span>
+          </Button>
           <Button variant="ghost" size="icon" title="Share quality" onClick={() => setOpen(true)}>
             <SlidersHorizontal />
           </Button>
