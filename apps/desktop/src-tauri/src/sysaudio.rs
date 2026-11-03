@@ -35,6 +35,11 @@ static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 // Read from the permission handler on the main thread, which must never wait on RUNNING
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 
+#[tauri::command]
+pub fn system_audio_supported() -> bool {
+    true
+}
+
 // Async so the wait for PipeWire runs off the main thread
 #[tauri::command(rename_all = "snake_case")]
 pub async fn system_audio_start(include_discord: bool) -> Result<String, String> {

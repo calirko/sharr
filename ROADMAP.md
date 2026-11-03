@@ -63,6 +63,7 @@ Main reason it exists: share system audio on Linux, which no browser can do (`ge
 - [x] Linux video: Chromium's `getDisplayMedia` (portal + PipeWire). Still needs a real share through the Hyprland portal picker
 - [x] Linux system audio: virtual PipeWire source fed by every app except sharr itself, captured by the page and published as the share's audio (tested locally: links, exclusion, cleanup, a viewer receives stereo 48 kHz)
 - [x] Windows: system audio from Chromium's picker with `restrictOwnAudio` (tested). No per-app exclusion, so Discord can't be left out there
+- [ ] Windows: per-app process loopback mixed in the app, so Discord can be left out; picker audio stays as the fallback
 - [x] ~~Publish through the LiveKit Rust SDK~~ not needed: the app publishes through the same web code, so the 1440p60 cap and quality tiers are shared
 - [x] Webview `getDisplayMedia` is enough for video on both OSes (Chromium)
 - [x] Signed auto-update via Tauri updater, CI builds + GitHub Releases on this public repo (Linux: AppImage)

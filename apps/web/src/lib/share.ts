@@ -7,7 +7,7 @@ import {
   type LocalParticipant,
 } from "livekit-client";
 import { toast } from "sonner";
-import { hasNativeSystemAudio, stopSystemAudio, systemAudioTrack } from "./desktop";
+import { hasNativeSystemAudio, nativeAudioReady, stopSystemAudio, systemAudioTrack } from "./desktop";
 import { AUTO_START, qualityTiers, tierIndex, type Fps, type QualityId, type QualityTier, type TierId } from "./quality";
 
 // One share per page at most, so the share's settings live here
@@ -50,7 +50,8 @@ function maxBitrate(quality: QualityId, tier: TierId) {
 
 // Voice processing is on by default and wrecks music and game audio.
 // restrictOwnAudio keeps the room's own playback out of system audio where Chrome supports it.
-function captureTracks(lp: LocalParticipant, tier: QualityTier, fps: Fps) {
+async function captureTracks(lp: LocalParticipant, tier: QualityTier, fps: Fps) {
+  await nativeAudioReady;
   return lp.createScreenTracks({
     audio: hasNativeSystemAudio
       ? false

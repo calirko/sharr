@@ -3,8 +3,13 @@
 import { toast } from "sonner";
 import { api } from "./api";
 
+type Channel = { onmessage: (data: ArrayBuffer) => void };
+
 type Tauri = {
-  core: { invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> };
+  core: {
+    invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T>;
+    Channel: new () => Channel;
+  };
   event: { listen<T>(event: string, cb: (e: { payload: T }) => void): Promise<() => void> };
 };
 
@@ -12,9 +17,21 @@ const tauri = (window as unknown as { __TAURI__?: Tauri }).__TAURI__;
 
 export const isDesktop = !!tauri;
 
+const isLinux = navigator.userAgent.includes("Linux");
+
 // Browsers can't capture system audio on Linux. There the app mixes every other app's output
-// into a virtual source, which we capture like a microphone.
-export const hasNativeSystemAudio = isDesktop && navigator.userAgent.includes("Linux");
+// into a virtual source, which we capture like a microphone. On Windows the app captures each
+// app with process loopback and streams the mix to the page, so Discord can be left out. Windows
+// without process loopback keeps the picker's audio. Set once nativeAudioReady resolves.
+export let hasNativeSystemAudio = isDesktop && isLinux;
+
+export const nativeAudioReady: Promise<void> =
+  isDesktop && !isLinux
+    ? tauri!.core.invoke<boolean>("system_audio_supported").then(
+        (v) => void (hasNativeSystemAudio = v),
+        () => {},
+      )
+    : Promise.resolve();
 
 const DISCORD_KEY = "sharr.share_discord";
 
@@ -36,6 +53,30 @@ export function setIncludeDiscord(include: boolean) {
 }
 
 export async function systemAudioTrack() {
+  return isLinux ? linuxAudioTrack() : windowsAudioTrack();
+}
+
+let audioCtx: AudioContext | null = null;
+
+// The app sends the mix in 20 ms chunks, the worklet plays them into a track
+async function windowsAudioTrack() {
+  audioCtx?.close();
+  const ctx = (audioCtx = new AudioContext({ sampleRate: 48000 }));
+  await ctx.audioWorklet.addModule("/sysaudio-worklet.js");
+  const node = new AudioWorkletNode(ctx, "sysaudio", { numberOfInputs: 0, outputChannelCount: [2] });
+  const dest = ctx.createMediaStreamDestination();
+  dest.channelCount = 2;
+  node.connect(dest);
+  // Nothing plays here, the context may start suspended
+  await ctx.resume().catch(() => {});
+
+  const channel = new tauri!.core.Channel();
+  channel.onmessage = (data) => node.port.postMessage(data, [data]);
+  await tauri!.core.invoke("system_audio_start", { include_discord: getIncludeDiscord(), on_audio: channel });
+  return dest.stream.getAudioTracks()[0];
+}
+
+async function linuxAudioTrack() {
   const label = await tauri!.core.invoke<string>("system_audio_start", { include_discord: getIncludeDiscord() });
   const find = async () =>
     (await navigator.mediaDevices.enumerateDevices()).find((d) => d.kind === "audioinput" && d.label === label);
@@ -72,7 +113,11 @@ export async function browserLogin() {
   return (await api.desktopRedeem(code)).user;
 }
 
-export const stopSystemAudio = () => tauri?.core.invoke("system_audio_stop").catch(() => {});
+export async function stopSystemAudio() {
+  audioCtx?.close();
+  audioCtx = null;
+  await tauri?.core.invoke("system_audio_stop").catch(() => {});
+}
 
 function showUpdate(version: string) {
   toast(`sharr ${version} is ready`, {

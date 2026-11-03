@@ -2,14 +2,22 @@
 mod idlefix;
 #[cfg(target_os = "linux")]
 mod sysaudio;
+#[cfg(windows)]
+#[path = "sysaudio_windows.rs"]
+mod sysaudio;
 mod link;
 mod login;
 mod single;
 mod update;
 
 // Other platforms get system audio from the browser engine itself
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", windows)))]
 mod sysaudio {
+    #[tauri::command]
+    pub fn system_audio_supported() -> bool {
+        false
+    }
+
     #[tauri::command(rename_all = "snake_case")]
     pub fn system_audio_start(include_discord: bool) -> Result<String, String> {
         let _ = include_discord;
@@ -94,6 +102,7 @@ pub fn run() {
             update::update_pending,
             update::update_install,
             login::browser_login,
+            sysaudio::system_audio_supported,
             sysaudio::system_audio_start,
             sysaudio::system_audio_stop,
             sysaudio::system_audio_include_discord,
@@ -122,6 +131,7 @@ pub fn run() {
                     .permission("allow-update-pending")
                     .permission("allow-update-install")
                     .permission("allow-browser-login")
+                    .permission("allow-system-audio-supported")
                     .permission("allow-system-audio-start")
                     .permission("allow-system-audio-stop")
                     .permission("allow-system-audio-include-discord"),
