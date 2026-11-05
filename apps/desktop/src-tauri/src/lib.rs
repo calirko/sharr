@@ -89,6 +89,11 @@ fn cef() -> tauri_runtime_cef::Cef {
 }
 
 pub fn run() {
+    // The system audio probe, run by the app itself in a child process (sysaudio_windows.rs)
+    #[cfg(windows)]
+    if std::env::args().any(|a| a == sysaudio::PROBE_ARG) {
+        sysaudio::probe_main();
+    }
     // CEF runs its helper processes from this binary too
     let helper = std::env::args().any(|a| a.starts_with("--type="));
     let link = if helper { None } else { link::from_args() };
@@ -212,12 +217,12 @@ pub fn run() {
                 // Chromium's error page and Cloudflare's 5xx pages give way to offline.html
                 .on_frame_event(move |e| {
                     if let (true, FrameEventKind::NavigationFailed { url }) = (e.is_main, e.kind) {
-                        offline::check(&failed, url);
+                        offline::check(&failed, url, true);
                     }
                 })
                 .on_page_load(move |_, p| {
                     if p.event() == tauri::webview::PageLoadEvent::Finished {
-                        offline::check(&loaded, p.url().clone());
+                        offline::check(&loaded, p.url().clone(), false);
                     }
                 })
                 .build()?;

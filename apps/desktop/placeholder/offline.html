@@ -6,19 +6,23 @@
 <title>sharr</title>
 <style>
   :root {
-    --bg: #fff; --fg: #252525; --muted: #8e8e8e; --border: #ebebeb; --hover: rgba(37,37,37,.1);
-    --primary: #262626; --primary-fg: #fafafa; --destructive: #e7000b;
+    --bg: oklch(1 0 0); --fg: oklch(0.145 0 0); --muted: oklch(0.556 0 0); --border: oklch(0.922 0 0);
+    --hover: oklch(0.145 0 0 / 10%); --primary: oklch(0.27 0 0); --primary-fg: oklch(0.985 0 0);
+    --destructive: oklch(0.55 0.19 27);
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.6 0 0 0 -0.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.1'/%3E%3C/svg%3E");
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #252525; --fg: #fafafa; --muted: #a1a1a1; --border: rgba(255,255,255,.1); --hover: rgba(250,250,250,.1);
-      --primary: #e5e5e5; --primary-fg: #343434;
+      --bg: oklch(0.145 0 0); --fg: oklch(0.985 0 0); --muted: oklch(0.708 0 0); --border: oklch(1 0 0 / 10%);
+      --hover: oklch(0.985 0 0 / 10%); --primary: oklch(0.92 0 0); --primary-fg: oklch(0.205 0 0);
+      --destructive: oklch(0.74 0.15 22);
+      --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.6 0 0 0 -0.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
     }
   }
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; }
   body {
-    background: var(--bg); color: var(--fg); display: flex; flex-direction: column;
+    background: var(--bg) var(--grain); color: var(--fg); display: flex; flex-direction: column;
     font: 14px/1.5 Inter, system-ui, sans-serif; user-select: none;
   }
   header { height: 2.25rem; display: flex; align-items: center; padding-left: .75rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -34,7 +38,7 @@
   h1 { font: 700 1.25rem "Space Grotesk", Inter, system-ui, sans-serif; letter-spacing: -.02em; }
   p { color: var(--muted); }
   .retry {
-    margin-top: .75rem; height: 2.25rem; padding: 0 1rem; border: 0; border-radius: .5rem;
+    margin-top: .75rem; height: 2.25rem; padding: 0 1rem; border: 0; border-radius: .625rem;
     background: var(--primary); color: var(--primary-fg); font: 500 14px Inter, system-ui, sans-serif;
   }
   .retry:disabled { opacity: .5; }
@@ -80,7 +84,7 @@
     timer = setTimeout(retry, 5000);
   }
   button.onclick = retry;
-  timer = setTimeout(retry, 5000);
+  timer = setTimeout(retry, 1500);
 </script>
 </body>
 </html>

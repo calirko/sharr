@@ -61,31 +61,88 @@ struct Running {
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 static SUPPORTED: OnceLock<bool> = OnceLock::new();
 
-/// Whether this Windows has process loopback. Tried once per launch. Named apart from
+/// Runs the loopback probe in a child process (see probe_main)
+pub const PROBE_ARG: &str = "--sharr-probe-loopback";
+
+/// Whether this Windows has process loopback. Tried once per launch, in a child process: on some
+/// machines (VMs without a real audio device, for one) opening the client corrupted the heap and
+/// took the whole app down. A crashed child only turns the feature off. Named apart from
 /// 0.1.9/0.1.10's system_audio_supported, whose probe crashed, so the page never calls that one.
 #[tauri::command]
 pub async fn system_audio_available() -> bool {
-    *SUPPORTED.get_or_init(|| {
-        if cfg!(debug_assertions) && std::env::var_os("SHARR_NO_LOOPBACK").is_some() {
+    if let Some(ok) = SUPPORTED.get() {
+        return *ok;
+    }
+    if cfg!(debug_assertions) && std::env::var_os("SHARR_NO_LOOPBACK").is_some() {
+        return *SUPPORTED.get_or_init(|| false);
+    }
+    let ok = tauri::async_runtime::spawn_blocking(probe).await.unwrap_or(false);
+    *SUPPORTED.get_or_init(|| ok)
+}
+
+fn probe() -> bool {
+    use std::os::windows::process::CommandExt;
+    use std::process::{Command, Stdio};
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let child = std::env::current_exe().and_then(|exe| {
+        Command::new(exe)
+            .arg(PROBE_ARG)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+    });
+    let mut child = match child {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("loopback probe didn't start ({e}), system audio comes from the picker");
             return false;
         }
-        // COM on a thread of our own, the command runs on a shared one
-        let ok = std::thread::spawn(|| {
-            let _com = Com::init();
-            // Released before CoUninitialize. As a tail expression the client outlived _com,
-            // which crashed 0.1.9 and 0.1.10.
-            let source = Source::open(unsafe { GetCurrentProcessId() });
-            let ok = source.is_ok();
-            drop(source);
-            ok
-        })
-        .join()
-        .unwrap_or(false);
-        if !ok {
-            log::warn!("process loopback unavailable, system audio comes from the picker");
+    };
+    // Activation itself gives up after 3s
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
         }
+    };
+    match status {
+        Some(s) if s.success() => {
+            log::info!("process loopback available");
+            true
+        }
+        Some(s) => {
+            // 1 is a clean "not supported", anything else (0xc0000374, say) is a crash
+            log::warn!("process loopback unavailable ({s}), system audio comes from the picker");
+            false
+        }
+        None => {
+            log::warn!("loopback probe timed out, system audio comes from the picker");
+            false
+        }
+    }
+}
+
+/// The probe child: exits 0 when a process loopback client opens, 1 when it doesn't
+pub fn probe_main() -> ! {
+    let ok = {
+        let _com = Com::init();
+        // Released before CoUninitialize. As a tail expression the client outlived _com,
+        // which crashed 0.1.9 and 0.1.10.
+        let source = Source::open(unsafe { GetCurrentProcessId() });
+        let ok = source.is_ok();
+        drop(source);
         ok
-    })
+    };
+    std::process::exit(if ok { 0 } else { 1 })
 }
 
 #[tauri::command(rename_all = "snake_case")]

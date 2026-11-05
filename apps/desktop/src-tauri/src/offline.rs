@@ -51,18 +51,25 @@ async fn reachable(app: &Url) -> bool {
 }
 
 /// A load of `url` in the main window failed or finished: show the offline page if the server is down
-pub fn check(app: &AppHandle, url: Url) {
+///
+/// `failed`: Chromium itself gave up on the load (DNS, TLS, refused). Our own check can disagree
+/// with it, so the offline page is shown anyway and its retry loop brings the app back.
+pub fn check(app: &AppHandle, url: Url, failed: bool) {
     let app_url = app.state::<AppUrl>().0.clone();
+    // Chromium's own error page
+    let chrome_error = url.scheme() == "chrome-error";
+    let url = if chrome_error { app_url.clone() } else { url };
     if url.origin() != app_url.origin() {
         return;
     }
+    let failed = failed || chrome_error;
     let state = app.state::<Offline>();
     if state.checking.swap(true, Ordering::SeqCst) {
         return;
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let up = reachable(&app_url).await;
+        let up = !failed && reachable(&app_url).await;
         let state = app.state::<Offline>();
         state.checking.store(false, Ordering::SeqCst);
         if up {
