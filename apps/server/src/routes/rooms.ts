@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono, type MiddlewareHandler } from "hono";
 import { z } from "zod";
+import { TrackSource } from "livekit-server-sdk";
 import { allowMessage, logMessage, MAX_LENGTH } from "../chatlog";
 import { config } from "../config";
 import { cleanName, clientIp, count, hit, limitByIp, ROOM_ID } from "../guard";
@@ -85,11 +86,23 @@ export const roomRoutes = new Hono<SessionEnv>()
     // Apply to people already in the room so the change is enforced now, not on next join
     const participants = await listParticipantsSafe(room.id);
     await Promise.all(
-      participants.map((p) =>
-        roomService
-          .updateParticipant(room.id, p.identity, { permission: permissionFor(canShare(room, p.identity)) })
-          .catch((err) => console.error(`permission update failed for ${p.identity}:`, err)),
-      ),
+      participants.map(async (p) => {
+        const allowed = canShare(room, p.identity);
+        try {
+          await roomService.updateParticipant(room.id, p.identity, { permission: permissionFor(allowed) });
+          // Their client stops the share when it sees the new grant. Muting makes sure viewers
+          // stop getting it either way.
+          if (!allowed) {
+            await Promise.all(
+              p.tracks
+                .filter((t) => t.source === TrackSource.SCREEN_SHARE || t.source === TrackSource.SCREEN_SHARE_AUDIO)
+                .map((t) => roomService.mutePublishedTrack(room.id, p.identity, t.sid, true)),
+            );
+          }
+        } catch (err) {
+          console.error(`permission update failed for ${p.identity}:`, err);
+        }
+      }),
     );
     return c.json({ room: publicRoom(room, participants.length) });
   })

@@ -3,8 +3,17 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { captureSources } from "@/lib/desktop";
-import { finishPick, isPicking, subscribePicker, type CaptureSource } from "@/lib/picker";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { captureSources, hasNativeSystemAudio } from "@/lib/desktop";
+import {
+  finishPick,
+  getPickerAudio,
+  isPicking,
+  setPickerAudio,
+  subscribePicker,
+  type CaptureSource,
+} from "@/lib/picker";
 import { cn } from "@/lib/utils";
 
 // Windows come and go and their contents change, so the list refreshes while open
@@ -18,6 +27,7 @@ export function SourcePicker() {
   const [sources, setSources] = useState<CaptureSource[] | null>(null);
   const [kind, setKind] = useState<Kind>("screen");
   const [selected, setSelected] = useState<string | null>(null);
+  const [audio, setAudio] = useState(getPickerAudio);
 
   useEffect(() => {
     if (!open) return;
@@ -52,7 +62,8 @@ export function SourcePicker() {
 
   function share(id = selected) {
     const source = sources?.find((s) => s.id === id);
-    if (source) finishPick(source);
+    // The app's own system audio is added by share.ts, the switch is only shown without it
+    if (source) finishPick({ source, audio: !hasNativeSystemAudio && audio });
   }
 
   return (
@@ -108,7 +119,20 @@ export function SourcePicker() {
             </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="sm:items-center">
+          {!hasNativeSystemAudio && (
+            <div className="flex items-center gap-2 max-sm:justify-between sm:mr-auto">
+              <Label htmlFor="picker-audio">Share system audio</Label>
+              <Switch
+                id="picker-audio"
+                checked={audio}
+                onCheckedChange={(v) => {
+                  setAudio(v);
+                  setPickerAudio(v);
+                }}
+              />
+            </div>
+          )}
           <Button variant="outline" onClick={() => finishPick(null)}>
             Cancel
           </Button>

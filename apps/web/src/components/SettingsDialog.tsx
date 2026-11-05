@@ -49,7 +49,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[min(36rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl sm:flex-row">
-        <nav className="bg-muted/50 flex shrink-0 flex-col gap-2 border-b p-3 sm:w-44 sm:border-r sm:border-b-0">
+        <nav className="bg-muted/50 flex shrink-0 flex-col gap-2 border-b p-3 max-sm:pr-12 sm:w-44 sm:border-r sm:border-b-0">
           <DialogTitle className="font-display px-1 pb-1">Settings</DialogTitle>
           <div className="flex gap-1 overflow-x-auto sm:flex-col">
             {TABS.map(({ id, label, icon: Icon }) => (
@@ -65,10 +65,16 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             ))}
           </div>
         </nav>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          {tab === "account" && <AccountPanel />}
-          {tab === "notifications" && <NotificationsPanel />}
-          {tab === "sessions" && <SessionsPanel />}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* Leaves room for the dialog's close button */}
+          <h2 className="flex h-12 shrink-0 items-center border-b px-4 pr-12 text-sm font-medium max-sm:hidden">
+            {TABS.find((t) => t.id === tab)?.label}
+          </h2>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+            {tab === "account" && <AccountPanel />}
+            {tab === "notifications" && <NotificationsPanel />}
+            {tab === "sessions" && <SessionsPanel />}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -258,7 +264,7 @@ function SessionsPanel() {
   return (
     <>
       <div className="flex items-center justify-between gap-4">
-        <p className="text-sm font-medium">Sessions</p>
+        <p className="text-sm font-medium sm:invisible">Sessions</p>
         {others && (
           <Button variant="outline" size="sm" disabled={busy !== null} onClick={revokeOthers}>
             <LogOut /> Log out other sessions

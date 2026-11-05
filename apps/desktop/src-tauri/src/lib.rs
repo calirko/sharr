@@ -64,6 +64,12 @@ fn allowed_in_app(url: &Url, app: &Url) -> bool {
     url.origin() == app.origin() || url.origin() == offline::page().origin() || url.scheme() == "about"
 }
 
+// For the small version label in the page
+#[tauri::command]
+fn app_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 fn cef() -> tauri_runtime_cef::Cef {
     let cef = tauri_runtime_cef::Cef::default()
         .persist_session_cookies(true)
@@ -119,6 +125,8 @@ pub fn run() {
             update::update_install,
             login::browser_login,
             offline::offline_retry,
+            offline::offline_check,
+            app_version,
             sharebar::hide_share_bar,
             picker::capture_picker_available,
             picker::capture_sources,
@@ -206,7 +214,9 @@ pub fn run() {
                 .min_inner_size(360.0, 480.0)
                 // The page draws its own title bar
                 .decorations(false)
-                .shadow(true)
+                // winit fakes the shadow on Windows by moving the client area 1px down, which
+                // leaves a black line along the top
+                .shadow(!cfg!(windows))
                 .on_navigation(move |to| {
                     if allowed_in_app(to, &app_origin) {
                         return true;

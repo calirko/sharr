@@ -6,7 +6,13 @@ import {
   useTracks,
 } from "@livekit/components-react";
 import { Ellipsis, LogOut, MessageSquare, Settings } from "lucide-react";
-import { RoomEvent, Track, type RemoteParticipant, type RemoteTrackPublication } from "livekit-client";
+import {
+  RoomEvent,
+  Track,
+  type Participant,
+  type RemoteParticipant,
+  type RemoteTrackPublication,
+} from "livekit-client";
 import { useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -28,6 +34,7 @@ import {
 import { toast } from "sonner";
 import type { JoinInfo, Room } from "@/lib/api";
 import { notify } from "@/lib/notify";
+import { isSharing, stopShare } from "@/lib/share";
 import { playSound } from "@/lib/sounds";
 import { useUser } from "@/lib/user";
 import { cn } from "@/lib/utils";
@@ -48,9 +55,10 @@ export function RoomView({ room, info, onRoomChange }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const side = useMediaQuery(SIDE_QUERY);
   // Sizes are remembered per layout, and with or without the sidebar
+  // The sidebar moved to the left, so side by side sizes are saved under a new id
   const mainLayout = useDefaultLayout({
-    id: side ? "room-side" : "room-stacked",
-    panelIds: chatOpen ? ["screens", "sidebar"] : ["screens"],
+    id: side ? "room-side-left" : "room-stacked",
+    panelIds: !chatOpen ? ["screens"] : side ? ["sidebar", "screens"] : ["screens", "sidebar"],
   });
   const sidebarLayout = useDefaultLayout({ id: "room-sidebar" });
   const { user } = useUser();
@@ -110,21 +118,56 @@ export function RoomView({ room, info, onRoomChange }: Props) {
     };
   }, [lkRoom]);
 
+  // LiveKit drops the tracks when the creator takes sharing away, but the capture, Auto and the
+  // app's system audio are ours to stop
+  useEffect(() => {
+    const onPermissions = (_prev: unknown, p: Participant) => {
+      if (p !== lkRoom.localParticipant || p.permissions?.canPublish !== false) return;
+      if (!isSharing() && !p.getTrackPublication(Track.Source.ScreenShare)) return;
+      stopShare(lkRoom.localParticipant);
+      toast("The room creator turned off sharing.");
+    };
+    lkRoom.on(RoomEvent.ParticipantPermissionsChanged, onPermissions);
+    return () => {
+      lkRoom.off(RoomEvent.ParticipantPermissionsChanged, onPermissions);
+    };
+  }, [lkRoom]);
+
   // Permissions change live when the creator edits who can share
   const canShare = permissions?.canPublish ?? info.can_share;
 
+  const sidebar = chatOpen && (
+    <ResizablePanel
+      id="sidebar"
+      defaultSize={side ? "20rem" : "40%"}
+      minSize={side ? "14rem" : "20%"}
+      maxSize="70%"
+      groupResizeBehavior={side ? "preserve-pixel-size" : "preserve-relative-size"}
+    >
+      <ResizablePanelGroup orientation="vertical" {...sidebarLayout}>
+        <ResizablePanel id="people" defaultSize="30%" minSize="3rem">
+          <ParticipantList roomId={room.id} creatorId={room.creator_id} canKick={info.is_creator} />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel id="chat" minSize="6rem" className="flex flex-col">
+          <ChatPanel roomName={room.name} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </ResizablePanel>
+  );
+
   return (
     <div className="flex h-full flex-col">
+      {/* Room controls sit right after the name, the user menu stays on the far right */}
       <header className="flex h-13 shrink-0 items-center gap-1 border-b px-2 sm:gap-2 sm:px-3">
-        <h1 className="font-display min-w-0 flex-1 truncate text-lg font-semibold">{room.name}</h1>
-        <div className="flex items-center gap-1 sm:gap-2">
-          {canShare && screens.length > 0 && <ShareButton />}
-          <div className="max-sm:hidden">
-            <CopyLinkButton roomId={room.id} roomName={room.name} />
+        <h1 className="font-display min-w-0 shrink truncate text-lg font-semibold">{room.name}</h1>
+        {canShare && screens.length > 0 && (
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <ShareButton />
           </div>
-        </div>
-        <div className="bg-border mx-1 h-5 w-px max-sm:hidden" />
-        <div className="flex items-center gap-0.5">
+        )}
+        <div className="bg-border mx-1 h-5 w-px shrink-0 max-sm:hidden" />
+        <div className="flex shrink-0 items-center gap-0.5">
           <Button
             variant="ghost"
             size="sm"
@@ -134,6 +177,9 @@ export function RoomView({ room, info, onRoomChange }: Props) {
           >
             <MessageSquare /> {participants.length}
           </Button>
+          <div className="max-sm:hidden">
+            <CopyLinkButton roomId={room.id} roomName={room.name} />
+          </div>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -159,7 +205,7 @@ export function RoomView({ room, info, onRoomChange }: Props) {
                 <Ellipsis />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="start">
               <DropdownMenuItem
                 onSelect={async () => {
                   if (await shareRoomLink(room.id, room.name)) toast("Link copied");
@@ -177,7 +223,7 @@ export function RoomView({ room, info, onRoomChange }: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="bg-border mx-1 h-5 w-px max-sm:hidden" />
+        <div className="min-w-0 flex-1" />
         <UserMenu compact />
       </header>
 
@@ -200,31 +246,14 @@ export function RoomView({ room, info, onRoomChange }: Props) {
         className="min-h-0 flex-1"
         {...mainLayout}
       >
+        {/* Side by side the sidebar goes left, stacked (phones) the screens stay on top */}
+        {side && sidebar}
+        {side && chatOpen && <ResizableHandle withHandle />}
         <ResizablePanel id="screens" minSize="20%" className="flex p-2">
           <ScreenGrid tracks={screens} emptyAction={canShare && <ShareButton large />} />
         </ResizablePanel>
-        {chatOpen && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel
-              id="sidebar"
-              defaultSize={side ? "20rem" : "40%"}
-              minSize={side ? "14rem" : "20%"}
-              maxSize="70%"
-              groupResizeBehavior={side ? "preserve-pixel-size" : "preserve-relative-size"}
-            >
-              <ResizablePanelGroup orientation="vertical" {...sidebarLayout}>
-                <ResizablePanel id="people" defaultSize="30%" minSize="3rem">
-                  <ParticipantList roomId={room.id} creatorId={room.creator_id} canKick={info.is_creator} />
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-                <ResizablePanel id="chat" minSize="6rem" className="flex flex-col">
-                  <ChatPanel roomName={room.name} />
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            </ResizablePanel>
-          </>
-        )}
+        {!side && chatOpen && <ResizableHandle withHandle />}
+        {!side && sidebar}
       </ResizablePanelGroup>
 
       <RoomSettingsDialog

@@ -8,7 +8,10 @@ export type CaptureSource = {
   thumb: string | null;
 };
 
-let pending: ((source: CaptureSource | null) => void) | null = null;
+// `audio`: the "Share system audio" switch, only offered without the app's own system audio
+export type Pick = { source: CaptureSource; audio: boolean };
+
+let pending: ((pick: Pick | null) => void) | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((cb) => cb());
 
@@ -22,15 +25,31 @@ export function subscribePicker(cb: () => void) {
 // Resolves with null when the dialog is closed without a pick
 export function pickSource() {
   pending?.(null);
-  return new Promise<CaptureSource | null>((resolve) => {
+  return new Promise<Pick | null>((resolve) => {
     pending = resolve;
     emit();
   });
 }
 
-export function finishPick(source: CaptureSource | null) {
+export function finishPick(pick: Pick | null) {
   const resolve = pending;
   pending = null;
   emit();
-  resolve?.(source);
+  resolve?.(pick);
+}
+
+const AUDIO_KEY = "sharr.picker_audio";
+
+export function getPickerAudio() {
+  try {
+    return localStorage.getItem(AUDIO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setPickerAudio(on: boolean) {
+  try {
+    localStorage.setItem(AUDIO_KEY, on ? "1" : "0");
+  } catch {}
 }

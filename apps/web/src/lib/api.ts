@@ -1,3 +1,5 @@
+import { reportOffline } from "./offline";
+
 export type User = {
   user_id: string;
   kind: "guest" | "discord";
@@ -69,11 +71,19 @@ export type SessionInfo = {
 };
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers: body === undefined ? undefined : { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (err) {
+    reportOffline();
+    throw err;
+  }
+  // Cloudflare's answers when the server is down
+  if (res.status >= 502 && res.status <= 504) reportOffline();
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data.error ?? "request_failed");
   return data as T;

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiError, type JoinInfo, type Room } from "@/lib/api";
 import { errorText } from "@/lib/errors";
+import { reportOffline } from "@/lib/offline";
 import { toast } from "sonner";
 
 // LiveKit logs through its own logger, which dropConsole can't strip
@@ -81,6 +82,8 @@ export function RoomPage({ id }: { id: string }) {
       if (reason === DisconnectReason.CLIENT_INITIATED) return navigate("/");
       const text = (reason !== undefined && endedText[reason]) || "Disconnected.";
       const final = reason === DisconnectReason.ROOM_DELETED || reason === DisconnectReason.PARTICIPANT_REMOVED;
+      // Lost the connection: the desktop app moves to its offline page if the server is gone too
+      if (!final && reason !== DisconnectReason.DUPLICATE_IDENTITY) reportOffline();
       setState({ kind: "ended", text, rejoin: !final });
     },
     [navigate],
@@ -89,6 +92,7 @@ export function RoomPage({ id }: { id: string }) {
   // Must be stable: LiveKitRoom calls connect() again whenever onError changes,
   // and that breaks a room that is mid-reconnect (common after a tab switch)
   const onError = useCallback((err: Error) => {
+    reportOffline();
     setState({ kind: "ended", text: `Could not connect to the media server (${err.message}).`, rejoin: true });
   }, []);
 

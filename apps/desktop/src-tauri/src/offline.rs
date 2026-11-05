@@ -94,3 +94,12 @@ pub async fn offline_retry(app: AppHandle, app_url: State<'_, AppUrl>, state: St
     }
     Ok(true)
 }
+
+/// Called by the page when it loses the server while running (offline event, failed API call,
+/// dropped room): same as a failed load of `url`
+#[tauri::command]
+pub fn offline_check(app: AppHandle, url: String, failed: bool) {
+    if let Ok(url) = url.parse() {
+        check(&app, url, failed);
+    }
+}

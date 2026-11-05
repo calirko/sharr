@@ -62,13 +62,15 @@ function maxBitrate(quality: QualityId, tier: TierId) {
 // restrictOwnAudio keeps the room's own playback out of system audio where Chrome supports it.
 async function captureTracks(lp: LocalParticipant, tier: QualityTier, fps: Fps): Promise<LocalTrack[]> {
   if (await hasOwnPicker()) {
-    const source = await pickSource();
+    const pick = await pickSource();
     // Same as closing the browser's picker
-    if (!source) throw new DOMException("No source picked", "NotAllowedError");
-    const track = await captureSource(source.id, widthOf(tier), tier.height, fps);
-    track.contentHint = "motion";
+    if (!pick) throw new DOMException("No source picked", "NotAllowedError");
+    const { video, audio } = await captureSource(pick.source.id, widthOf(tier), tier.height, fps, pick.audio);
+    video.contentHint = "motion";
     hideShareBar();
-    return [new LocalVideoTrack(track, undefined, true)];
+    const tracks: LocalTrack[] = [new LocalVideoTrack(video, undefined, true)];
+    if (audio) tracks.push(new LocalAudioTrack(audio, undefined, true));
+    return tracks;
   }
   await nativeAudioReady;
   const tracks = await lp.createScreenTracks({
@@ -294,6 +296,9 @@ async function autoTick() {
   setAutoTier(to);
   await applyTier(s).catch(() => {});
 }
+
+// Our share is running, even if LiveKit already took its tracks away
+export const isSharing = () => share !== null;
 
 function stopAuto() {
   if (share) clearInterval(share.timer);

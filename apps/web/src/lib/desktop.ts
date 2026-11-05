@@ -23,7 +23,7 @@ const isLinux = navigator.userAgent.includes("Linux");
 // Browsers can't capture system audio on Linux. There the app mixes every other app's output
 // into a virtual source, which we capture like a microphone. On Windows the app captures each
 // app with process loopback and streams the mix to the page, so Discord can be left out. Windows
-// without process loopback keeps the picker's audio. Set once nativeAudioReady resolves.
+// without process loopback gets whole-system audio from our picker. Set once nativeAudioReady resolves.
 export let hasNativeSystemAudio = isDesktop && isLinux;
 
 export const nativeAudioReady: Promise<void> =
@@ -108,36 +108,48 @@ async function linuxAudioTrack() {
   return stream.getAudioTracks()[0];
 }
 
-// Our own source picker instead of Chromium's (Windows apps from 0.1.12). Only used with the
-// app's system audio, since the picked capture has no audio of its own.
+// Our own source picker instead of Chromium's (Windows apps from 0.1.12). Without process loopback
+// the picker offers whole-system audio instead (from 0.1.14).
 const pickerAvailable: Promise<boolean> = isDesktop
   ? tauri!.core.invoke<boolean>("capture_picker_available").catch(() => false)
   : Promise.resolve(false);
 
 export async function hasOwnPicker() {
   await nativeAudioReady;
-  return hasNativeSystemAudio && (await pickerAvailable);
+  return pickerAvailable;
 }
 
 export const captureSources = () => tauri!.core.invoke<CaptureSource[]>("capture_sources");
 
-// The app grants desktop capture only for a moment after the pick (picker.rs)
-export async function captureSource(id: string, width: number, height: number, fps: number) {
+// The app grants desktop capture only for a moment after the pick (picker.rs). `audio` is the
+// whole system's output, the room's own playback included. If that fails the share goes on
+// without it.
+export async function captureSource(id: string, width: number, height: number, fps: number, audio: boolean) {
+  const video = {
+    mandatory: {
+      chromeMediaSource: "desktop",
+      chromeMediaSourceId: id,
+      maxWidth: width,
+      maxHeight: height,
+      maxFrameRate: fps,
+    },
+  };
+  const capture = (withAudio: boolean) =>
+    navigator.mediaDevices.getUserMedia({
+      audio: withAudio ? { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: id } } : false,
+      video,
+    } as unknown as MediaStreamConstraints);
   await tauri!.core.invoke("capture_arm");
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        mandatory: {
-          chromeMediaSource: "desktop",
-          chromeMediaSourceId: id,
-          maxWidth: width,
-          maxHeight: height,
-          maxFrameRate: fps,
-        },
-      },
-    } as unknown as MediaStreamConstraints);
-    return stream.getVideoTracks()[0];
+    let stream: MediaStream;
+    try {
+      stream = await capture(audio);
+    } catch (err) {
+      if (!audio) throw err;
+      toast.error("Could not capture system audio. Sharing without it.");
+      stream = await capture(false);
+    }
+    return { video: stream.getVideoTracks()[0], audio: stream.getAudioTracks()[0] as MediaStreamTrack | undefined };
   } finally {
     tauri!.core.invoke("capture_disarm").catch(() => {});
   }
@@ -208,6 +220,11 @@ export function watchUpdates() {
   tauri.core.invoke<string | null>("update_pending").then((v) => v && showUpdate(v), () => {});
   tauri.event.listen<string>("update-ready", (e) => showUpdate(e.payload));
 }
+
+// Shown small in a corner. Apps before 0.1.14 don't know the command.
+export const appVersion: Promise<string | null> = isDesktop
+  ? tauri!.core.invoke<string>("app_version").catch(() => null)
+  : Promise.resolve(null);
 
 export type ResizeEdge = "North" | "South" | "East" | "West" | "NorthEast" | "NorthWest" | "SouthEast" | "SouthWest";
 
