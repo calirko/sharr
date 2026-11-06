@@ -144,9 +144,11 @@ async function doStartShare(lp: LocalParticipant, quality: QualityId, fps: Fps) 
         await lp.publishTrack(track, {
           source: Track.Source.ScreenShare,
           screenShareEncoding: { maxBitrate: maxBitrate(quality, tierId), maxFramerate: fps },
-          // H.264 is hardware encoded on most machines, VP8 (the default) never is.
-          // One layer instead of simulcast: encoding the screen two or three times costs too much CPU.
-          videoCodec: "h264",
+          // VP8, not H.264: the desktop app's CEF has no software H.264, so H.264 depends on the GPU
+          // there. LiveKit then fell back to a VP8 backup for every share, encoding the screen twice.
+          // One layer and no backup codec: one encode only.
+          videoCodec: "vp8",
+          backupCodec: false,
           simulcast: false,
         });
       } else {
