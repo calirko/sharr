@@ -1,7 +1,7 @@
 // Bridge to the desktop app (apps/desktop). The same web build runs in the browser and in the app;
 // the app injects window.__TAURI__ for this origin only.
 import { toast } from "sonner";
-import { api } from "./api";
+import { api, ApiError, type AppLogLine } from "./api";
 import type { CaptureSource } from "./picker";
 
 type Channel = { onmessage: (data: ArrayBuffer) => void };
@@ -244,3 +244,40 @@ export const appWindow = {
   isMaximized: () => tauri!.core.invoke<boolean>("plugin:window|is_maximized"),
   startResize: (value: ResizeEdge) => tauri!.core.invoke("plugin:window|start_resize_dragging", { value }),
 };
+
+// The app's own log goes to the server (bun run admin logs), so problems on someone's machine
+// can be looked at. Lines that couldn't go out are handed back to the app for the next try.
+const LOG_EVERY = 30_000;
+// Under the server's 8 KB body limit
+const LOG_CHUNK = 6000;
+
+export function uploadLogs() {
+  if (!isDesktop) return;
+  const os = isLinux ? "linux" : "windows";
+  const version = tauri!.core.invoke<string>("app_version").catch(() => "unknown");
+  const send = async () => {
+    const lines = await tauri!.core.invoke<AppLogLine[]>("app_logs").catch(() => []);
+    for (let i = 0; i < lines.length; ) {
+      const chunk: AppLogLine[] = [];
+      let size = 0;
+      while (i < lines.length && chunk.length < 50) {
+        const line = { ...lines[i], msg: lines[i].msg.slice(0, 1000) };
+        size += JSON.stringify(line).length;
+        if (chunk.length && size > LOG_CHUNK) break;
+        chunk.push(line);
+        i++;
+      }
+      try {
+        await api.uploadLogs({ version: await version, os, lines: chunk });
+      } catch (err) {
+        // Logged out, rate limited or offline: try again later. A rejected body is dropped.
+        if (!(err instanceof ApiError) || (err.status !== 400 && err.status !== 403)) {
+          tauri!.core.invoke("app_logs_return", { lines: lines.slice(i - chunk.length) }).catch(() => {});
+        }
+        return;
+      }
+    }
+  };
+  setTimeout(send, 10_000);
+  setInterval(send, LOG_EVERY);
+}

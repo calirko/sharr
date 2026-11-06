@@ -1,3 +1,4 @@
+import { LOG_STREAM } from "./applog";
 import { STREAM } from "./chatlog";
 import { listParticipantsSafe, roomService } from "./livekit";
 import { redis } from "./redis";
@@ -27,16 +28,17 @@ export async function deleteAccount(userId: string) {
     }
   }
 
-  await purgeChat(userId);
+  await purgeStream(STREAM, userId);
+  await purgeStream(LOG_STREAM, userId);
 }
 
-async function purgeChat(userId: string) {
+async function purgeStream(stream: string, userId: string) {
   let start = "-";
   for (;;) {
-    const entries = (await redis.send("XRANGE", [STREAM, start, "+", "COUNT", String(BATCH)])) as [string, string[]][];
+    const entries = (await redis.send("XRANGE", [stream, start, "+", "COUNT", String(BATCH)])) as [string, string[]][];
     if (!entries?.length) return;
     const mine = entries.filter(([, fields]) => fieldOf(fields, "user_id") === userId).map(([id]) => id);
-    if (mine.length) await redis.send("XDEL", [STREAM, ...mine]);
+    if (mine.length) await redis.send("XDEL", [stream, ...mine]);
     if (entries.length < BATCH) return;
     start = `(${entries[entries.length - 1][0]}`;
   }

@@ -5,7 +5,7 @@ import { SourcePicker } from "./components/SourcePicker";
 import { TitleBar } from "./components/TitleBar";
 import { VersionTag } from "./components/VersionTag";
 import { Toaster } from "./components/ui/sonner";
-import { disguiseBrowser, isDesktop, watchUpdates } from "./lib/desktop";
+import { disguiseBrowser, isDesktop, uploadLogs, watchUpdates } from "./lib/desktop";
 import { registerServiceWorker } from "./lib/notify";
 import { watchOffline } from "./lib/offline";
 import { initTheme } from "./lib/theme";
@@ -28,5 +28,6 @@ createRoot(document.getElementById("root")!).render(
 
 watchUpdates();
 disguiseBrowser();
+uploadLogs();
 registerServiceWorker();
 watchOffline();

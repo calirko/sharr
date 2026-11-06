@@ -70,6 +70,8 @@ export type SessionInfo = {
   is_current: boolean;
 };
 
+export type AppLogLine = { ts: number; level: string; target: string; msg: string };
+
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
@@ -95,6 +97,7 @@ export const api = {
   rename: (nickname: string) => call<{ user: User }>("PATCH", "/session", { nickname }),
   logout: () => call<{ ok: true }>("DELETE", "/session"),
   desktopCode: () => call<{ code: string }>("POST", "/session/desktop-code"),
+  uploadLogs: (body: { version: string; os: string; lines: AppLogLine[] }) => call<{ ok: true }>("POST", "/logs", body),
   desktopRedeem: (code: string) => call<{ user: User }>("POST", "/session/desktop-redeem", { code }),
   sessions: () => call<{ sessions: SessionInfo[] }>("GET", "/account/sessions"),
   revokeSession: (id: string) => call<{ ok: true }>("DELETE", `/account/sessions/${encodeURIComponent(id)}`),

@@ -5,6 +5,7 @@ mod sysaudio;
 #[cfg(windows)]
 #[path = "sysaudio_windows.rs"]
 mod sysaudio;
+mod applog;
 mod link;
 mod login;
 mod offline;
@@ -108,7 +109,8 @@ pub fn run() {
     }
     #[cfg(target_os = "linux")]
     sysaudio::use_bundled_pipewire();
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("sharr_lib=info")).init();
+    applog::init();
+    log::info!("sharr {} on {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS);
     let url = app_url();
 
     tauri::Builder::default()
@@ -127,6 +129,8 @@ pub fn run() {
             offline::offline_retry,
             offline::offline_check,
             app_version,
+            applog::app_logs,
+            applog::app_logs_return,
             sharebar::hide_share_bar,
             picker::capture_picker_available,
             picker::capture_sources,
@@ -173,6 +177,8 @@ pub fn run() {
                     .permission("allow-system-audio-start")
                     .permission("allow-system-audio-stop")
                     .permission("allow-system-audio-include-discord")
+                    .permission("allow-app-logs")
+                    .permission("allow-app-logs-return")
                     .permission("notification:allow-notify")
                     .permission("notification:allow-is-permission-granted")
                     .permission("notification:allow-request-permission")

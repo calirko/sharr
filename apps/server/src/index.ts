@@ -11,6 +11,7 @@ import { redis } from "./redis";
 import { accountRoutes } from "./routes/account";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
+import { logRoutes } from "./routes/logs";
 import { roomRoutes } from "./routes/rooms";
 import { sessionRoutes } from "./routes/session";
 import { sessionMiddleware, type SessionEnv } from "./session";
@@ -32,6 +33,7 @@ api.route("/session", sessionRoutes);
 api.route("/account", accountRoutes);
 api.route("/rooms", roomRoutes);
 api.route("/admin", adminRoutes);
+api.route("/logs", logRoutes);
 api.route("/activity", activityRoutes);
 api.all("*", (c) => c.json({ error: "not_found" }, 404));
 

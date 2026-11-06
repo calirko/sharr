@@ -101,8 +101,9 @@ fn probe() -> bool {
             return false;
         }
     };
-    // Activation itself gives up after 3s
-    let deadline = Instant::now() + Duration::from_secs(5);
+    // Activation itself gives up after 3s. Starting the exe (CEF and all) can take a while too.
+    let started = Instant::now();
+    let deadline = started + Duration::from_secs(15);
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Some(status),
@@ -114,35 +115,41 @@ fn probe() -> bool {
             }
         }
     };
+    let ms = started.elapsed().as_millis();
     match status {
         Some(s) if s.success() => {
-            log::info!("process loopback available");
+            log::info!("process loopback available ({ms} ms)");
             true
         }
         Some(s) => {
-            // 1 is a clean "not supported", anything else (0xc0000374, say) is a crash
-            log::warn!("process loopback unavailable ({s}), system audio comes from the picker");
+            // The probe exits with the failing HRESULT. Anything else (0xc0000374, say) is a crash.
+            let code = s.code().map(|c| format!("{:#010x}", c as u32)).unwrap_or_else(|| "none".into());
+            log::warn!("process loopback unavailable (exit {code}, {ms} ms), system audio comes from the picker");
             false
         }
         None => {
-            log::warn!("loopback probe timed out, system audio comes from the picker");
+            log::warn!("loopback probe timed out ({ms} ms), system audio comes from the picker");
             false
         }
     }
 }
 
-/// The probe child: exits 0 when a process loopback client opens, 1 when it doesn't
+/// The probe child: exits 0 when a process loopback client opens, else with the failing HRESULT
 pub fn probe_main() -> ! {
-    let ok = {
+    let code = {
         let _com = Com::init();
         // Released before CoUninitialize. As a tail expression the client outlived _com,
         // which crashed 0.1.9 and 0.1.10.
         let source = Source::open(unsafe { GetCurrentProcessId() });
-        let ok = source.is_ok();
+        let code = match &source {
+            Ok(_) => 0,
+            Err(e) if e.code().0 == 0 => 1,
+            Err(e) => e.code().0,
+        };
         drop(source);
-        ok
+        code
     };
-    std::process::exit(if ok { 0 } else { 1 })
+    std::process::exit(code)
 }
 
 #[tauri::command(rename_all = "snake_case")]
