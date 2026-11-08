@@ -65,8 +65,8 @@ static SUPPORTED: OnceLock<bool> = OnceLock::new();
 pub const PROBE_ARG: &str = "--sharr-probe-loopback";
 
 /// Whether this Windows has process loopback. Tried once per launch, in a child process: on some
-/// machines (VMs without a real audio device, for one) opening the client corrupted the heap and
-/// took the whole app down. A crashed child only turns the feature off. Named apart from
+/// machines opening the client corrupted the heap and took the whole app down (see activate).
+/// A crashed child only turns the feature off. Named apart from
 /// 0.1.9/0.1.10's system_audio_supported, whose probe crashed, so the page never calls that one.
 #[tauri::command]
 pub async fn system_audio_available() -> bool {
@@ -154,8 +154,14 @@ pub fn probe_main() -> ! {
             Err(e) => e.code().0,
         };
         drop(source);
+        if cfg!(debug_assertions) {
+            eprintln!("[probe] released the client");
+        }
         code
     };
+    if cfg!(debug_assertions) {
+        eprintln!("[probe] COM uninitialized, exit {code:#x}");
+    }
     std::process::exit(code)
 }
 
@@ -417,7 +423,13 @@ struct Source {
 
 impl Source {
     fn open(pid: u32) -> WinResult<Self> {
+        let step = |s: &str| {
+            if cfg!(debug_assertions) {
+                eprintln!("[probe] {s}");
+            }
+        };
         let client = activate(pid)?;
+        step("activated");
         let format = WAVEFORMATEX {
             // WAVE_FORMAT_IEEE_FLOAT
             wFormatTag: 3,
@@ -437,9 +449,13 @@ impl Source {
                 0,
                 &format,
                 None,
-            )?;
+            )
+            .inspect_err(|e| step(&format!("Initialize: {:#010x}", e.code().0 as u32)))?;
+            step("initialized");
             let capture: IAudioCaptureClient = client.GetService()?;
+            step("got the capture client");
             client.Start()?;
+            step("started");
             Ok(Source { client, capture, fifo: VecDeque::new(), primed: false, dead: false })
         }
     }
@@ -522,7 +538,9 @@ fn activate(pid: u32) -> WinResult<IAudioClient> {
             },
         },
     };
-    let prop = PROPVARIANT {
+    // Never dropped: PROPVARIANT's Drop runs PropVariantClear, which CoTaskMemFrees a VT_BLOB's
+    // data. That is `params` on the stack here, and freeing it corrupted the heap (0xc0000374).
+    let prop = std::mem::ManuallyDrop::new(PROPVARIANT {
         Anonymous: PROPVARIANT_0 {
             Anonymous: std::mem::ManuallyDrop::new(PROPVARIANT_0_0 {
                 vt: VT_BLOB,
@@ -535,14 +553,14 @@ fn activate(pid: u32) -> WinResult<IAudioClient> {
                 ..Default::default()
             }),
         },
-    };
+    });
     let (tx, rx) = mpsc::channel();
     let handler: IActivateAudioInterfaceCompletionHandler = Activated(Mutex::new(Some(tx))).into();
     unsafe {
         let op = ActivateAudioInterfaceAsync(
             VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
             &IAudioClient::IID,
-            Some(&prop),
+            Some(&*prop),
             &handler,
         )
         .inspect_err(|e| step(&format!("ActivateAudioInterfaceAsync: {:#010x} {}", e.code().0 as u32, e.message())))?;
