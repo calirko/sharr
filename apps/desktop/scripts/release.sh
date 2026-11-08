@@ -6,7 +6,8 @@
 #   scripts/release.sh --build    same builds, no release
 #   scripts/release.sh --debug    Windows debug installer only (console with the app log)
 #
-# Windows is cross-compiled with cargo-xwin. Needs: cargo-xwin (cargo install --locked cargo-xwin),
+# The AppImage is built in an Ubuntu container (scripts/appimage-docker.sh, needs docker), Windows
+# is cross-compiled with cargo-xwin. Needs: cargo-xwin (cargo install --locked cargo-xwin),
 # the x86_64-pc-windows-msvc rust target, clang-cl, lld, cmake, ninja, makensis (AUR nsis), and
 # for the release gh plus the signing key in ~/.tauri.
 set -euo pipefail
@@ -20,13 +21,30 @@ case "${1:-}" in
   *) echo "usage: $0 [--build|--debug]" >&2; exit 1 ;;
 esac
 
-for t in cargo-xwin makensis clang-cl lld-link cmake ninja; do
+export PATH="$HOME/.cargo/bin:$PATH"
+for t in cargo-xwin makensis clang-cl lld-link cmake ninja docker jq curl unzip; do
   command -v "$t" >/dev/null || { echo "missing $t" >&2; exit 1; }
 done
 
+# The AUR makensis only has amd64 stubs and defaults to that target, but Tauri's installer
+# and its nsis_tauri_utils plugin are x86. Add the official zip's x86 data and a wrapper
+# that sets the target, first on PATH.
+nsis=$HOME/.cache/sharr-nsis
+nsis_version=3.13
+if [ ! -x "$nsis/bin/makensis" ] || [ ! -d "$nsis/data/Stubs" ]; then
+  rm -rf "$nsis" && mkdir -p "$nsis/bin"
+  curl -fsSL -o "$nsis/nsis.zip" "https://downloads.sourceforge.net/project/nsis/NSIS%203/$nsis_version/nsis-$nsis_version.zip"
+  unzip -q "$nsis/nsis.zip" -d "$nsis"
+  cp -r "$(dirname "$(readlink -f /usr/bin/makensis)")/../share/nsis" "$nsis/data"
+  cp -rn "$nsis/nsis-$nsis_version/Stubs/." "$nsis/data/Stubs/"
+  cp -rn "$nsis/nsis-$nsis_version/Plugins/." "$nsis/data/Plugins/"
+  real=$(command -v makensis)
+  printf '#!/bin/sh\nNSISDIR="%s" exec %s "-XTarget x86-unicode" "$@"\n' "$nsis/data" "$real" >"$nsis/bin/makensis"
+  chmod +x "$nsis/bin/makensis"
+fi
+export PATH="$nsis/bin:$PATH"
+
 export CEF_PATH="${CEF_PATH:-$HOME/.cache/sharr-cef}"
-export ANYLINUX_LIB_SOURCE=https://raw.githubusercontent.com/FabianLars/Anylinux-AppImages/3e280d1b2270fecfcb2c2c823b490c782ecf1277/useful-tools/lib/anylinux.c
-export GTK_CLASS_FIX_SOURCE=https://raw.githubusercontent.com/FabianLars/Anylinux-AppImages/3e280d1b2270fecfcb2c2c823b490c782ecf1277/useful-tools/lib/gtk-class-fix.c
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
   TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/sharr.key)
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$(cat ~/.tauri/sharr.key.password)
@@ -68,10 +86,10 @@ build_windows() {
   bun run tauri build --runner cargo-xwin --target $win --bundles nsis "$@"
 }
 
+linux_out=src-tauri/target/appimage-docker
 build_linux() {
-  cargo build --release --manifest-path src-tauri/Cargo.toml -p cef-dll-sys
-  placeholders
-  bun run tauri build --bundles appimage --config "$(scripts/appimage-libs.sh)"
+  rm -rf "$linux_out"
+  scripts/appimage-docker.sh "$linux_out"
 }
 
 if [ "$mode" = debug ]; then
@@ -84,7 +102,7 @@ build_linux
 build_windows
 
 dist=$(mktemp -d)
-cp src-tauri/target/release/bundle/appimage/*.AppImage{,.sig} "$dist"/
+cp "$linux_out"/*.AppImage{,.sig} "$dist"/
 cp src-tauri/target/$win/release/bundle/nsis/*-setup.exe{,.sig} "$dist"/
 appimage=$(cd "$dist" && ls *.AppImage)
 setup=$(cd "$dist" && ls *-setup.exe)
