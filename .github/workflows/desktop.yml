@@ -8,6 +8,11 @@ on:
     branches: [main]
     paths: ["apps/desktop/**", ".github/workflows/desktop.yml"]
   workflow_dispatch:
+    inputs:
+      debug:
+        description: "Windows debug build (console with the app log, devtools via SHARR_DEVTOOLS_PORT)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -77,6 +82,8 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             bun run tauri build --verbose --bundles appimage --config "$(scripts/appimage-libs.sh)"
+          elif [ "${{ inputs.debug }}" = true ]; then
+            bun run tauri build --debug --bundles nsis
           else
             bun run tauri build --bundles nsis
           fi
@@ -89,6 +96,7 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage.sig
             apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
             apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+            apps/desktop/src-tauri/target/debug/bundle/nsis/*-setup.exe
           if-no-files-found: error
 
   release:

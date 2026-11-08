@@ -90,8 +90,9 @@ fn probe() -> bool {
             .arg(PROBE_ARG)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .creation_flags(CREATE_NO_WINDOW)
+            // Debug builds show the probe's steps in the console
+            .stderr(if cfg!(debug_assertions) { Stdio::inherit() } else { Stdio::null() })
+            .creation_flags(if cfg!(debug_assertions) { 0 } else { CREATE_NO_WINDOW })
             .spawn()
     });
     let mut child = match child {
@@ -141,6 +142,12 @@ pub fn probe_main() -> ! {
         // Released before CoUninitialize. As a tail expression the client outlived _com,
         // which crashed 0.1.9 and 0.1.10.
         let source = Source::open(unsafe { GetCurrentProcessId() });
+        if cfg!(debug_assertions) {
+            match &source {
+                Ok(_) => eprintln!("[probe] process loopback client opened"),
+                Err(e) => eprintln!("[probe] failed: {:#010x} {}", e.code().0 as u32, e.message()),
+            }
+        }
         let code = match &source {
             Ok(_) => 0,
             Err(e) if e.code().0 == 0 => 1,
@@ -500,6 +507,12 @@ impl IAgileObject_Impl for Activated_Impl {}
 
 /// An audio client for pid's process tree
 fn activate(pid: u32) -> WinResult<IAudioClient> {
+    let step = |s: &str| {
+        if cfg!(debug_assertions) {
+            eprintln!("[probe] {s}");
+        }
+    };
+    step(&format!("activating loopback for pid {pid}"));
     let mut params = AUDIOCLIENT_ACTIVATION_PARAMS {
         ActivationType: AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
         Anonymous: AUDIOCLIENT_ACTIVATION_PARAMS_0 {
@@ -531,11 +544,14 @@ fn activate(pid: u32) -> WinResult<IAudioClient> {
             &IAudioClient::IID,
             Some(&prop),
             &handler,
-        )?;
+        )
+        .inspect_err(|e| step(&format!("ActivateAudioInterfaceAsync: {:#010x} {}", e.code().0 as u32, e.message())))?;
+        step("waiting for activation");
         rx.recv_timeout(Duration::from_secs(3)).map_err(|_| windows::core::Error::from(HRESULT(0x8000_000Au32 as i32)))?;
         let mut hr = HRESULT(0);
         let mut unknown: Option<IUnknown> = None;
         op.GetActivateResult(&mut hr, &mut unknown)?;
+        step(&format!("activate result {:#010x}", hr.0 as u32));
         hr.ok()?;
         unknown.ok_or_else(|| windows::core::Error::from(HRESULT(0x8000_4003u32 as i32)))?.cast()
     }
